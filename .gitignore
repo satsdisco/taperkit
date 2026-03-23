@@ -1,0 +1,4 @@
+node_modules/
+dist/
+.taperkit-recents.json
+*.js.map
