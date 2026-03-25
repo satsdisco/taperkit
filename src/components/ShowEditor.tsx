@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { ShowInfo, ApplyResult } from '../types'
 import TrackTable from './TrackTable'
 import PreviewPane from './PreviewPane'
+import ArtworkPicker from './ArtworkPicker'
 
 interface ShowEditorProps {
   show: ShowInfo
@@ -90,86 +91,100 @@ export default function ShowEditor({ show, onShowChange }: ShowEditorProps) {
           Show Info
         </h2>
 
-        {/* Row 1: Artist, Date */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 160px', gap: '12px', marginBottom: '12px' }}>
-          <div>
-            <label style={labelStyle}>Artist</label>
-            <input
-              type="text"
-              value={show.artist}
-              onChange={e => updateField('artist', e.target.value)}
-              placeholder="Widespread Panic"
-              style={inputStyle}
-            />
-          </div>
-          <div>
-            <label style={labelStyle}>Date</label>
-            <input
-              type="text"
-              value={show.date}
-              onChange={e => updateField('date', e.target.value)}
-              placeholder="YYYY-MM-DD"
-              style={inputStyle}
-            />
-          </div>
+        {/* Release type toggle */}
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+          {(['live', 'album'] as const).map(t => (
+            <button
+              key={t}
+              onClick={() => onShowChange({ ...show, releaseType: t })}
+              style={{
+                padding: '5px 16px',
+                background: show.releaseType === t ? 'var(--accent)' : 'var(--surface)',
+                color: show.releaseType === t ? '#1a1a1a' : 'var(--text-muted)',
+                border: '1px solid var(--border)',
+                borderRadius: '4px',
+                fontWeight: show.releaseType === t ? 600 : 400,
+                fontSize: '12px',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                cursor: 'pointer',
+              }}
+            >
+              {t === 'live' ? '🎤 Live Show' : '💿 Official Album'}
+            </button>
+          ))}
         </div>
 
-        {/* Row 2: Venue, City, State */}
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 80px', gap: '12px', marginBottom: '12px' }}>
-          <div>
-            <label style={labelStyle}>Venue</label>
-            <input
-              type="text"
-              value={show.venue}
-              onChange={e => updateField('venue', e.target.value)}
-              placeholder="Town Ballroom"
-              style={inputStyle}
-            />
-          </div>
-          <div>
-            <label style={labelStyle}>City</label>
-            <input
-              type="text"
-              value={show.city}
-              onChange={e => updateField('city', e.target.value)}
-              placeholder="Buffalo"
-              style={inputStyle}
-            />
-          </div>
-          <div>
-            <label style={labelStyle}>State</label>
-            <input
-              type="text"
-              value={show.state}
-              onChange={e => updateField('state', e.target.value)}
-              placeholder="NY"
-              style={inputStyle}
-            />
-          </div>
-        </div>
-
-        {/* Row 3: Source, Notes */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '12px' }}>
-          <div>
-            <label style={labelStyle}>Source</label>
-            <input
-              type="text"
-              value={show.source}
-              onChange={e => updateField('source', e.target.value)}
-              placeholder="SBD, AUD, Matrix..."
-              style={inputStyle}
-            />
-          </div>
-          <div>
-            <label style={labelStyle}>Notes / Comment</label>
-            <input
-              type="text"
-              value={show.notes}
-              onChange={e => updateField('notes', e.target.value)}
-              placeholder="Taper info, lineage..."
-              style={inputStyle}
-            />
-          </div>
+        {/* Row 1: Artist + Date (live) or Artist + Album Title + Year (album) */}
+        {show.releaseType === 'live' ? (
+          <>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 160px', gap: '12px', marginBottom: '12px' }}>
+              <div>
+                <label style={labelStyle}>Artist</label>
+                <input type="text" value={show.artist} onChange={e => updateField('artist', e.target.value)} placeholder="Widespread Panic" style={inputStyle} />
+              </div>
+              <div>
+                <label style={labelStyle}>Date</label>
+                <input type="text" value={show.date} onChange={e => updateField('date', e.target.value)} placeholder="YYYY-MM-DD" style={inputStyle} />
+              </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 80px', gap: '12px', marginBottom: '12px' }}>
+              <div>
+                <label style={labelStyle}>Venue</label>
+                <input type="text" value={show.venue} onChange={e => updateField('venue', e.target.value)} placeholder="Town Ballroom" style={inputStyle} />
+              </div>
+              <div>
+                <label style={labelStyle}>City</label>
+                <input type="text" value={show.city} onChange={e => updateField('city', e.target.value)} placeholder="Buffalo" style={inputStyle} />
+              </div>
+              <div>
+                <label style={labelStyle}>State</label>
+                <input type="text" value={show.state} onChange={e => updateField('state', e.target.value)} placeholder="NY" style={inputStyle} />
+              </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '12px' }}>
+              <div>
+                <label style={labelStyle}>Source</label>
+                <input type="text" value={show.source} onChange={e => updateField('source', e.target.value)} placeholder="SBD, AUD, Matrix..." style={inputStyle} />
+              </div>
+              <div>
+                <label style={labelStyle}>Notes / Comment</label>
+                <input type="text" value={show.notes} onChange={e => updateField('notes', e.target.value)} placeholder="Taper info, lineage..." style={inputStyle} />
+              </div>
+            </div>
+          </>
+        ) : (
+          <>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr 100px', gap: '12px', marginBottom: '12px' }}>
+              <div>
+                <label style={labelStyle}>Artist</label>
+                <input type="text" value={show.artist} onChange={e => updateField('artist', e.target.value)} placeholder="Widespread Panic" style={inputStyle} />
+              </div>
+              <div>
+                <label style={labelStyle}>Album Title</label>
+                <input type="text" value={show.albumTitle || ''} onChange={e => updateField('albumTitle', e.target.value)} placeholder="Light Fuse, Get Away" style={inputStyle} />
+              </div>
+              <div>
+                <label style={labelStyle}>Year</label>
+                <input type="text" value={show.year || ''} onChange={e => updateField('year', e.target.value)} placeholder="1998" style={inputStyle} />
+              </div>
+            </div>
+            <div style={{ padding: '8px 12px', background: 'rgba(255,140,66,0.08)', border: '1px solid rgba(255,140,66,0.2)', borderRadius: '4px', fontSize: '12px', color: 'var(--text-muted)' }}>
+              Official album mode — files will be named <code>01 Track Title.flac</code> with no disc prefix. Album folder: <code>{show.artist || 'Artist'}/{show.albumTitle || 'Album Title'}{show.year ? ` (${show.year})` : ''}/</code>
+            </div>
+          </>
+        )}
+        {/* Artwork */}
+        <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--border)' }}>
+          <ArtworkPicker
+            artist={show.artist}
+            date={show.date}
+            venue={show.venue}
+            city={show.city}
+            state={show.state}
+            destDir={outputDir && show.artist ? `${outputDir}/${show.artist}/${[show.date, show.venue].filter(Boolean).join(' ') || 'Unknown'}` : undefined}
+            artistDir={outputDir && show.artist ? `${outputDir}/${show.artist}` : undefined}
+          />
         </div>
       </div>
 

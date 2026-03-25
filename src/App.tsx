@@ -1,9 +1,10 @@
 import React, { useState } from 'react'
 import FolderPicker from './components/FolderPicker'
 import ShowEditor from './components/ShowEditor'
+import Library from './components/Library'
 import { ShowInfo } from './types'
 
-type AppView = 'home' | 'editor'
+type AppView = 'home' | 'editor' | 'library'
 
 export default function App() {
   const [view, setView] = useState<AppView>('home')
@@ -66,7 +67,10 @@ export default function App() {
             ←
           </button>
         )}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <button
+          onClick={() => { setView('home'); setShow(null); setError(null) }}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', gap: '10px' }}
+        >
           <span
             style={{
               fontSize: '18px',
@@ -80,7 +84,43 @@ export default function App() {
           <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>
             Live music library manager
           </span>
-        </div>
+        </button>
+
+        {/* Nav links */}
+        <nav style={{ display: 'flex', gap: '4px', marginLeft: '8px' }}>
+          <button
+            onClick={() => { setView('home'); setShow(null); setError(null) }}
+            style={{
+              background: 'none',
+              border: 'none',
+              padding: '4px 12px',
+              borderRadius: '4px',
+              fontSize: '13px',
+              cursor: 'pointer',
+              color: view === 'home' || view === 'editor' ? 'var(--accent)' : 'var(--text-muted)',
+              fontWeight: view === 'home' || view === 'editor' ? 600 : 400,
+              borderBottom: view === 'home' || view === 'editor' ? '2px solid var(--accent)' : '2px solid transparent',
+            }}
+          >
+            Show Editor
+          </button>
+          <button
+            onClick={() => setView('library')}
+            style={{
+              background: 'none',
+              border: 'none',
+              padding: '4px 12px',
+              borderRadius: '4px',
+              fontSize: '13px',
+              cursor: 'pointer',
+              color: view === 'library' ? 'var(--accent)' : 'var(--text-muted)',
+              fontWeight: view === 'library' ? 600 : 400,
+              borderBottom: view === 'library' ? '2px solid var(--accent)' : '2px solid transparent',
+            }}
+          >
+            Library
+          </button>
+        </nav>
       </header>
 
       {/* Main content */}
@@ -118,6 +158,8 @@ export default function App() {
         {!loading && view === 'editor' && show && (
           <ShowEditor show={show} onShowChange={setShow} />
         )}
+
+        {view === 'library' && <Library />}
       </main>
 
       <style>{`

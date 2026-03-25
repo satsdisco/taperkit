@@ -7,12 +7,17 @@ export interface RenameTarget {
   track: number
   title: string
   artist: string
+  releaseType?: 'live' | 'album'
+  // live
   date: string
   venue: string
   city: string
   state: string
   source: string
   notes: string
+  // album
+  albumTitle?: string
+  year?: string
 }
 
 export interface RenameResult {
@@ -30,7 +35,7 @@ function sanitizePathComponent(str: string): string {
     .trim()
 }
 
-function buildAlbumName(date: string, venue: string, city: string, state: string): string {
+export function buildAlbumName(date: string, venue: string, city: string, state: string): string {
   const parts = [date]
   if (venue) parts.push(venue)
   if (city && state) {
@@ -41,11 +46,19 @@ function buildAlbumName(date: string, venue: string, city: string, state: string
   return parts.join(' ')
 }
 
-function buildTrackFilename(disc: number, track: number, title: string, ext: string): string {
+function buildLiveTrackFilename(disc: number, track: number, title: string, ext: string): string {
   const discPart = `d${disc}`
   const trackPart = String(track).padStart(2, '0')
-  const titlePart = title ? ` ${sanitizePathComponent(title)}` : ''
+  const cleanTitle = title ? sanitizePathComponent(title.replace(/\.[a-z0-9]{2,5}$/i, '')) : ''
+  const titlePart = cleanTitle ? ` ${cleanTitle}` : ''
   return `${discPart}-${trackPart}${titlePart}${ext}`
+}
+
+function buildAlbumTrackFilename(track: number, title: string, ext: string): string {
+  const trackPart = String(track).padStart(2, '0')
+  const cleanTitle = title ? sanitizePathComponent(title.replace(/\.[a-z0-9]{2,5}$/i, '')) : ''
+  const titlePart = cleanTitle ? ` ${cleanTitle}` : ''
+  return `${trackPart}${titlePart}${ext}`
 }
 
 export function buildTargetPath(
@@ -54,11 +67,19 @@ export function buildTargetPath(
 ): string {
   const ext = path.extname(target.sourceFilePath).toLowerCase()
   const artist = sanitizePathComponent(target.artist || 'Unknown Artist')
+
+  if (target.releaseType === 'album') {
+    const albumName = sanitizePathComponent(
+      target.albumTitle ? `${target.albumTitle}${target.year ? ` (${target.year})` : ''}` : 'Unknown Album'
+    )
+    const trackFilename = buildAlbumTrackFilename(target.track, target.title, ext)
+    return path.join(outputDir, artist, albumName, trackFilename)
+  }
+
   const albumName = sanitizePathComponent(
     buildAlbumName(target.date, target.venue, target.city, target.state)
   )
-  const trackFilename = buildTrackFilename(target.disc, target.track, target.title, ext)
-
+  const trackFilename = buildLiveTrackFilename(target.disc, target.track, target.title, ext)
   return path.join(outputDir, artist, albumName, trackFilename)
 }
 

@@ -22,15 +22,22 @@ export interface TrackInfo {
   subFolder?: string
 }
 
+export type ReleaseType = 'live' | 'album'
+
 export interface ShowInfo {
   folderPath: string
+  releaseType: ReleaseType
   artist: string
+  // Live show fields
   date: string
   venue: string
   city: string
   state: string
   source: string
   notes: string
+  // Official album fields
+  albumTitle: string
+  year: string
   tracks: TrackInfo[]
 }
 
@@ -42,7 +49,7 @@ function isAudioFile(filename: string): boolean {
 }
 
 // Parse disc number from subfolder name
-function parseDiscFromFolder(folderName: string): number | null {
+export function parseDiscFromFolder(folderName: string): number | null {
   const lower = folderName.toLowerCase().trim()
 
   // "Disc 1", "disc1", "DISC 2"
@@ -101,6 +108,16 @@ function parseFilename(filename: string): { disc: number | null; track: number |
     }
   }
 
+  // d1_t01_Title or d1_t01 Title  (disc_trackWithT_Title)
+  const d_tTT = base.match(/^d(\d+)[_-]t(\d+)[_\s-]?\s*(.*)$/i)
+  if (d_tTT) {
+    return {
+      disc: parseInt(d_tTT[1], 10),
+      track: parseInt(d_tTT[2], 10),
+      title: d_tTT[3].replace(/[_]/g, ' ').trim() || null,
+    }
+  }
+
   // d1_01 - Title or d1-01 - Title
   const d_TT = base.match(/^d(\d+)[_-](\d+)\s*[-_]?\s*(.*)$/i)
   if (d_TT) {
@@ -114,10 +131,13 @@ function parseFilename(filename: string): { disc: number | null; track: number |
   // 01 - Title or 01_Title
   const trackTitle = base.match(/^(\d{1,3})\s*[-_]\s*(.+)$/)
   if (trackTitle) {
+    // Strip nugs-style t0N_ infix: "01 - t01_Intro" → title "Intro"
+    const rawTitle = trackTitle[2].replace(/_/g, ' ').trim()
+    const strippedTitle = rawTitle.replace(/^t\d+\s*/i, '').trim()
     return {
       disc: null,
       track: parseInt(trackTitle[1], 10),
-      title: trackTitle[2].replace(/_/g, ' ').trim(),
+      title: strippedTitle || rawTitle,
     }
   }
 
@@ -139,48 +159,92 @@ function parseFilename(filename: string): { disc: number | null; track: number |
 export function parseFolderName(folderName: string): Partial<ShowInfo> {
   const result: Partial<ShowInfo> = {}
 
-  // YYYY-MM-DD Venue, City, State
-  // YYYY-MM-DD - Venue - City, State
-  // YYYY-MM-DD - Venue, City, State
-  const dateMatch = folderName.match(/^(\d{4}-\d{2}-\d{2})\s*(?:-\s*)?(.+)$/)
-  if (dateMatch) {
-    result.date = dateMatch[1]
-    const rest = dateMatch[2].trim()
+  // Strip trailing quality/format junk: [16-48], [FLAC], (V0), - FLAC16, powered by nugs.net, etc.
+  let cleanName = folderName
+    .replace(/\s*\[[^\]]*\]/g, '')           // [anything]
+    .replace(/\s*\([^)]*\)/g, '')            // (anything)
+    .replace(/\s*-?\s*FLAC\d*$/i, '')        // trailing -FLAC16
+    .replace(/\s*-?\s*WEB\s*V\d.*$/i, '')    // trailing -WEB V0...
+    .replace(/\s*powered by.*$/i, '')         // powered by nugs.net
+    .trim()
 
-    // Try: Venue - City, State
-    const venueCityState1 = rest.match(/^(.+?)\s*-\s*([^,]+),\s*([A-Z]{2})$/)
-    if (venueCityState1) {
-      result.venue = venueCityState1[1].trim()
-      result.city = venueCityState1[2].trim()
-      result.state = venueCityState1[3].trim()
-      return result
-    }
+  // Strip leading taper prefixes before the date: "db", "tdb", "gd", "wsp", "phish", etc.
+  // Pattern: optional 2-5 letter taper code immediately followed by YYYY-MM-DD or YYYYMMDD
+  cleanName = cleanName.replace(/^[a-z]{1,5}(?=\d{4}[-\/]?\d{2}[-\/]?\d{2})/i, '').trim()
+  // Also strip leading taper code separated by space: "tdb 2008-04-18..."
+  cleanName = cleanName.replace(/^[a-z]{1,5}\s+(?=\d{4}[-\/]?\d{2}[-\/]?\d{2})/i, '').trim()
+  // Also strip taper code separated by dash: "tDB - 2009-04-25 ..."
+  cleanName = cleanName.replace(/^[a-z]{1,5}\s*-\s*(?=\d{4}[-\/]?\d{2}[-\/]?\d{2})/i, '').trim()
 
-    // Try: Venue, City, State  (last two parts are City, State)
-    const parts = rest.split(',').map(p => p.trim())
+  // Helper: parse venue/city/state from a string
+  function parseVenueStr(str: string): void {
+    // Strip any remaining junk in parens/brackets
+    str = str.replace(/\s*\[[^\]]*\]/g, '').replace(/\s*\([^)]*\)/g, '').trim()
+    if (!str) return
+
+    // "Venue - City, ST"
+    const m1 = str.match(/^(.+?)\s*-\s*([^,\-]+),\s*([A-Z]{2,3}(?:\s*\(.*\))?)$/)
+    if (m1) { result.venue = m1[1].trim(); result.city = m1[2].trim(); result.state = m1[3].trim(); return }
+
+    // "Venue, City, ST" — last part is state (2 letters), second-last is city
+    const parts = str.split(',').map(p => p.trim()).filter(Boolean)
     if (parts.length >= 3) {
-      result.state = parts[parts.length - 1]
-      result.city = parts[parts.length - 2]
-      result.venue = parts.slice(0, parts.length - 2).join(', ')
-      return result
+      const lastPart = parts[parts.length - 1]
+      if (/^[A-Z]{2,3}$/.test(lastPart) || /^[A-Z]{2,3}\s/.test(lastPart)) {
+        result.state = lastPart
+        result.city = parts[parts.length - 2]
+        result.venue = parts.slice(0, parts.length - 2).join(', ')
+        return
+      }
     }
 
     if (parts.length === 2) {
-      // Could be "Venue Name, City ST" or "City, State"
-      const cityState = parts[1].match(/^(.+)\s+([A-Z]{2})$/)
-      if (cityState) {
-        result.venue = parts[0]
-        result.city = cityState[1].trim()
-        result.state = cityState[2]
-      } else {
-        result.venue = parts[0]
-        result.city = parts[1]
-      }
-      return result
+      // "Venue, City ST" or "Venue, City"
+      const cityState = parts[1].match(/^(.+?)\s+([A-Z]{2,3})$/)
+      if (cityState) { result.venue = parts[0]; result.city = cityState[1].trim(); result.state = cityState[2]; return }
+      result.venue = parts[0]; result.city = parts[1]; return
     }
 
-    // Just a venue
-    result.venue = rest
+    if (parts.length === 1) {
+      result.venue = parts[0]
+    }
+  }
+
+  // Normalise underscore dates: 1999_09_24 → 1999-09-24
+  cleanName = cleanName.replace(/^(\d{4})_(\d{2})_(\d{2})/, '$1-$2-$3')
+
+  // Pattern 1: YYYY-MM-DD [- ] rest
+  const p1 = cleanName.match(/^(\d{4}-\d{2}-\d{2})\s*(?:-\s*)?(.+)$/)
+  if (p1) {
+    result.date = p1[1]
+    parseVenueStr(p1[2])
+    return result
+  }
+
+  // Pattern 2: YYYYMMDD rest (no dashes in date)
+  const p2 = cleanName.match(/^(\d{4})(\d{2})(\d{2})[_\s-](.+)$/)
+  if (p2) {
+    result.date = `${p2[1]}-${p2[2]}-${p2[3]}`
+    parseVenueStr(p2[4])
+    return result
+  }
+
+  // Pattern 3: Artist - YYYY-MM-DD - rest
+  const p3 = cleanName.match(/^(.+?)\s*-\s*(\d{4}-\d{2}-\d{2})\s*-\s*(.*)$/)
+  if (p3) {
+    result.artist = p3[1].trim().replace(/[-–—\s]+$/, '').trim()
+    result.date = p3[2]
+    if (p3[3]) parseVenueStr(p3[3])
+    return result
+  }
+
+  // Pattern 4: Artist YYYY-MM-DD [- ] rest  (no dash between artist and date)
+  const p4 = cleanName.match(/^(.+?)\s+(\d{4}-\d{2}-\d{2})\s*(?:-\s*)?(.*)$/)
+  if (p4) {
+    result.artist = p4[1].trim().replace(/[-–—\s]+$/, '').trim()
+    result.date = p4[2]
+    if (p4[3]) parseVenueStr(p4[3])
+    return result
   }
 
   return result
@@ -232,8 +296,20 @@ export async function scanFolder(folderPath: string): Promise<ShowInfo> {
   const folderName = path.basename(resolvedPath)
   const parsedFolder = parseFolderName(folderName)
 
+  // Detect release type: if no date parsed and folder looks like "Album Title (Year)" → album
+  const hasDate = !!parsedFolder.date
+  const albumYearMatch = folderName.match(/\((\d{4})\)/) || folderName.match(/\[(\d{4})\]/)
+  const looksLikeAlbum = !hasDate && !!albumYearMatch
+  const releaseType: ReleaseType = looksLikeAlbum ? 'album' : 'live'
+  const albumYear = albumYearMatch ? albumYearMatch[1] : ''
+  // Strip year and quality junk for album title
+  const albumTitle = looksLikeAlbum
+    ? folderName.replace(/\s*\(.*?\)/g, '').replace(/\s*\[.*?\]/g, '').trim()
+    : ''
+
   const show: ShowInfo = {
     folderPath: resolvedPath,
+    releaseType,
     artist: parsedFolder.artist || '',
     date: parsedFolder.date || '',
     venue: parsedFolder.venue || '',
@@ -241,6 +317,8 @@ export async function scanFolder(folderPath: string): Promise<ShowInfo> {
     state: parsedFolder.state || '',
     source: '',
     notes: '',
+    albumTitle,
+    year: albumYear,
     tracks: [],
   }
 
@@ -305,7 +383,15 @@ export async function scanFolder(folderPath: string): Promise<ShowInfo> {
     }
 
     // Title: prefer existing tags, then parsed from filename
-    let title = existingTags.title || parsed.title || ''
+    // Strip common taper cruft from tag titles
+    const rawTagTitle = existingTags.title
+      ? existingTags.title
+          .replace(/^[-\s]+/, '')                              // leading dash/space: "- 10-05d1t01 Title"
+          .replace(/^\d{2}-\d{2}d\d+t\d+\s*/i, '')           // MM-DDdNtNN prefix
+          .replace(/^t\d+[-_\s]*/i, '')                       // t01_ prefix
+          .trim()
+      : ''
+    let title = rawTagTitle || parsed.title || ''
 
     // Pull artist/album from tags if show info is missing
     if (!show.artist && existingTags.artist) show.artist = existingTags.artist

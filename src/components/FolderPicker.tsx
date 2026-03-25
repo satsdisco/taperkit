@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect } from 'react'
 
 interface FolderPickerProps {
   onFolderSelect: (path: string) => void
@@ -8,7 +8,6 @@ interface FolderPickerProps {
 export default function FolderPicker({ onFolderSelect, error }: FolderPickerProps) {
   const [inputValue, setInputValue] = useState('')
   const [recents, setRecents] = useState<string[]>([])
-  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     fetch('/api/recent')
@@ -24,21 +23,16 @@ export default function FolderPicker({ onFolderSelect, error }: FolderPickerProp
     }
   }
 
-  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files
-    if (files && files.length > 0) {
-      // webkitdirectory gives us relative paths; get the common parent
-      const firstPath = (files[0] as File & { webkitRelativePath: string }).webkitRelativePath
-      const topFolder = firstPath.split('/')[0]
-      // We can't get the absolute path from the browser file input directly,
-      // but we set the folder name in the input so the user can see it
-      // and optionally adjust the full path
-      setInputValue(topFolder)
+  const handleBrowse = async () => {
+    try {
+      const res = await fetch('/api/browse')
+      const data: { path: string | null } = await res.json()
+      if (data.path) {
+        setInputValue(data.path)
+      }
+    } catch {
+      // ignore
     }
-  }
-
-  const handleBrowse = () => {
-    fileInputRef.current?.click()
   }
 
   return (
@@ -122,16 +116,6 @@ export default function FolderPicker({ onFolderSelect, error }: FolderPickerProp
               </button>
             </div>
           </form>
-
-          {/* Hidden file input for browsing */}
-          <input
-            ref={fileInputRef}
-            type="file"
-            style={{ display: 'none' }}
-            // @ts-ignore - webkitdirectory not in TS types
-            webkitdirectory=""
-            onChange={handleFileInput}
-          />
 
           {error && (
             <div

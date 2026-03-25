@@ -1,4 +1,4 @@
-import { execSync } from 'child_process'
+import { execSync, execFileSync } from 'child_process'
 import path from 'path'
 
 export interface TagData {
@@ -33,8 +33,7 @@ function escapeShellArg(value: string): string {
 }
 
 export function writeFLACTags(filePath: string, tags: TagData): void {
-  const args: string[] = ['--remove-all-tags']
-
+  // Use execFileSync with array args — no shell interpretation, no quoting issues
   const tagMap: Record<string, string> = {
     ARTIST: tags.artist,
     ALBUM: tags.album,
@@ -45,32 +44,32 @@ export function writeFLACTags(filePath: string, tags: TagData): void {
     COMMENT: tags.comment,
   }
 
+  const args: string[] = ['--remove-all-tags']
   for (const [key, value] of Object.entries(tagMap)) {
-    if (value) {
-      args.push(`--set-tag=${key}=${escapeShellArg(value)}`)
-    }
+    if (value) args.push(`--set-tag=${key}=${value}`)
   }
+  args.push(filePath)
 
-  args.push(`'${escapeShellArg(filePath)}'`)
-
-  const cmd = `metaflac ${args.join(' ')}`
-  execSync(cmd, { stdio: 'pipe' })
+  execFileSync('metaflac', args, { stdio: 'pipe' })
 }
 
 export function writeMP3Tags(filePath: string, tags: TagData): void {
+  // Use execFileSync with array args
   const args: string[] = []
+  if (tags.artist) args.push('-a', tags.artist)
+  if (tags.album) args.push('-A', tags.album)
+  if (tags.title) args.push('-t', tags.title)
+  if (tags.tracknumber) {
+    const trackNum = tags.discnumber ? `${tags.tracknumber}` : tags.tracknumber
+    args.push('-T', trackNum)
+  }
+  if (tags.date) args.push('-y', tags.date)
+  if (tags.comment) args.push('-c', tags.comment)
+  // id3v2 doesn't have a --disc flag; write TPOS frame directly
+  if (tags.discnumber) args.push('--TPOS', tags.discnumber)
+  args.push(filePath)
 
-  if (tags.artist) args.push(`-a '${escapeShellArg(tags.artist)}'`)
-  if (tags.album) args.push(`-A '${escapeShellArg(tags.album)}'`)
-  if (tags.title) args.push(`-t '${escapeShellArg(tags.title)}'`)
-  if (tags.tracknumber) args.push(`-T '${escapeShellArg(tags.tracknumber)}'`)
-  if (tags.date) args.push(`-y '${escapeShellArg(tags.date)}'`)
-  if (tags.comment) args.push(`-c '${escapeShellArg(tags.comment)}'`)
-
-  args.push(`'${escapeShellArg(filePath)}'`)
-
-  const cmd = `id3v2 ${args.join(' ')}`
-  execSync(cmd, { stdio: 'pipe' })
+  execFileSync('id3v2', args, { stdio: 'pipe' })
 }
 
 export function writeTags(filePath: string, tags: TagData): { success: boolean; error?: string } {
