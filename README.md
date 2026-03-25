@@ -42,27 +42,26 @@ Node.js 18+ required.
 
 ---
 
-## Install
+## Install & Run
 
 ```bash
 git clone https://github.com/satsdisco/taperkit.git
 cd taperkit
 npm install
+npm start
 ```
 
----
+That's it. `npm start` builds the frontend and starts the server. Your browser opens automatically at [http://localhost:7337](http://localhost:7337).
 
-## Run
+### Development mode
+
+If you're hacking on the code, run dev mode instead — hot reload on both frontend and backend:
 
 ```bash
-# Start frontend dev server (port 5173)
-npx vite --host &
-
-# Start API server (port 7337)
-npx tsx server/index.ts
+npm run dev
 ```
 
-Then open [http://localhost:5173](http://localhost:5173).
+Frontend at `localhost:5173`, API at `localhost:7337`.
 
 ---
 

@@ -3,11 +3,9 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently \"npm run server\" \"npm run client\"",
-    "server": "node --loader ts-node/esm server/index.ts",
-    "client": "vite",
+    "dev": "concurrently \"npx tsx server/index.ts\" \"vite\"",
     "build": "vite build",
-    "start": "npm run dev"
+    "start": "npm run build && npx tsx server/index.ts"
   },
   "dependencies": {
     "@types/multer": "^2.1.0",

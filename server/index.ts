@@ -504,6 +504,25 @@ app.get('/api/artwork/existing', (req, res) => {
   return res.json({ images: found })
 })
 
+// Serve built frontend in production (when dist/ exists)
+const distPath = path.join(__dirname, '..', 'dist')
+if (fs.existsSync(distPath)) {
+  app.use(express.static(distPath))
+  // SPA fallback — serve index.html for all non-API routes
+  app.get('*', (_req, res) => {
+    res.sendFile(path.join(distPath, 'index.html'))
+  })
+}
+
 app.listen(PORT, () => {
-  console.log(`TaperKit server running on http://localhost:${PORT}`)
+  console.log(`TaperKit running on http://localhost:${PORT}`)
+  // Auto-open browser in production mode
+  if (fs.existsSync(distPath)) {
+    const url = `http://localhost:${PORT}`
+    const cmd = process.platform === 'darwin' ? `open "${url}"` :
+                process.platform === 'win32' ? `start "${url}"` : `xdg-open "${url}"`
+    import('child_process').then(({ execSync }) => {
+      try { execSync(cmd) } catch { /* ignore */ }
+    })
+  }
 })
