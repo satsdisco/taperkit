@@ -128,6 +128,16 @@ function parseFilename(filename: string): { disc: number | null; track: number |
     }
   }
 
+  // "01 01 – Title" or "01 01 - Title" — double number prefix (common in some rips)
+  const doubleNum = base.match(/^(\d{1,3})\s+\d{1,3}\s*[–—-]\s*(.+)$/)
+  if (doubleNum) {
+    return {
+      disc: null,
+      track: parseInt(doubleNum[1], 10),
+      title: doubleNum[2].trim() || null,
+    }
+  }
+
   // 01 - Title or 01_Title
   const trackTitle = base.match(/^(\d{1,3})\s*[-_]\s*(.+)$/)
   if (trackTitle) {
@@ -159,8 +169,14 @@ function parseFilename(filename: string): { disc: number | null; track: number |
 export function parseFolderName(folderName: string): Partial<ShowInfo> {
   const result: Partial<ShowInfo> = {}
 
+  // Extract a standalone year from parens before we strip them: "(1971)", "(2019)"
+  let extractedYear: string | undefined
+  const yearInParens = folderName.match(/\((\d{4})\)/)
+  if (yearInParens) extractedYear = yearInParens[1]
+
   // Strip trailing quality/format junk: [16-48], [FLAC], (V0), - FLAC16, powered by nugs.net, etc.
   let cleanName = folderName
+    .replace(/\s*\{[^}]*\}/g, '')            // {anything} (catalog numbers like {NW6135})
     .replace(/\s*\[[^\]]*\]/g, '')           // [anything]
     .replace(/\s*\([^)]*\)/g, '')            // (anything)
     .replace(/\s*-?\s*FLAC\d*$/i, '')        // trailing -FLAC16
@@ -196,6 +212,11 @@ export function parseFolderName(folderName: string): Partial<ShowInfo> {
         result.venue = parts.slice(0, parts.length - 2).join(', ')
         return
       }
+      // Fallback for 3+ parts without state code: "Venue, City, Country"
+      result.state = lastPart
+      result.city = parts[parts.length - 2]
+      result.venue = parts.slice(0, parts.length - 2).join(', ')
+      return
     }
 
     if (parts.length === 2) {
@@ -210,11 +231,37 @@ export function parseFolderName(folderName: string): Partial<ShowInfo> {
     }
   }
 
+  // === Live Phish special handling (MUST run before general underscore date normalization) ===
+  // Detect "Live Phish" prefix → mark artist as Phish
+  if (/^Live\s+Phish\b/i.test(cleanName)) {
+    result.artist = 'Phish'
+  }
+  // Volume + underscore date: "Live Phish 04_ 6_14_00, Venue, City" → "2000-06-14, Venue, City"
+  cleanName = cleanName.replace(/^Live\s+Phish\s+\d{1,2}_\s*(\d{1,2})_(\d{1,2})_(\d{2})\b/i, (_, m, d, y) => {
+    const year = parseInt(y) < 50 ? `20${y.padStart(2,'0')}` : `19${y.padStart(2,'0')}`
+    return `${year}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`
+  })
+  // No-volume underscore date: "Live Phish MM_DD_YY" → "YYYY-MM-DD"
+  cleanName = cleanName.replace(/^Live\s+Phish\s+(\d{1,2})_\s*(\d{1,2})_(\d{2})\b/i, (_, m, d, y) => {
+    const year = parseInt(y) < 50 ? `20${y.padStart(2,'0')}` : `19${y.padStart(2,'0')}`
+    return `${year}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`
+  })
+  // Strip "Live Phish" prefix (with optional dash): "Live Phish - 04-03-1998 ..." → "04-03-1998 ..."
+  cleanName = cleanName.replace(/^Live\s+Phish\s*-?\s*/i, '').trim()
+
+  // === General date normalization ===
   // Normalise underscore dates: 1999_09_24 → 1999-09-24
   cleanName = cleanName.replace(/^(\d{4})_(\d{2})_(\d{2})/, '$1-$2-$3')
+  // Normalise MM_DD_YY or MM_ D_YY (with optional spaces) → YYYY-MM-DD
+  cleanName = cleanName.replace(/\b(\d{1,2})_\s*(\d{1,2})_(\d{2})\b/g, (_, m, d, y) => {
+    const year = parseInt(y) < 50 ? `20${y.padStart(2,'0')}` : `19${y.padStart(2,'0')}`
+    return `${year}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`
+  })
+  // Normalise MM-DD-YYYY → YYYY-MM-DD (LivePhish folder naming: "04-03-1998 Nassau...")
+  cleanName = cleanName.replace(/^(\d{2})-(\d{2})-(\d{4})/, '$3-$1-$2')
 
-  // Pattern 1: YYYY-MM-DD [- ] rest
-  const p1 = cleanName.match(/^(\d{4}-\d{2}-\d{2})\s*(?:-\s*)?(.+)$/)
+  // Pattern 1: YYYY-MM-DD [- ,] rest
+  const p1 = cleanName.match(/^(\d{4}-\d{2}-\d{2})\s*(?:[-,]\s*)?(.+)$/)
   if (p1) {
     result.date = p1[1]
     parseVenueStr(p1[2])
@@ -229,22 +276,63 @@ export function parseFolderName(folderName: string): Partial<ShowInfo> {
     return result
   }
 
-  // Pattern 3: Artist - YYYY-MM-DD - rest
-  const p3 = cleanName.match(/^(.+?)\s*-\s*(\d{4}-\d{2}-\d{2})\s*-\s*(.*)$/)
-  if (p3) {
-    result.artist = p3[1].trim().replace(/[-–—\s]+$/, '').trim()
-    result.date = p3[2]
-    if (p3[3]) parseVenueStr(p3[3])
+  // Pattern 3a: Artist - YYYY-MM-DD - rest  (greedy artist to handle hyphenated names like "Drive-By Truckers")
+  // Key insight: match greedily up to the LAST occurrence of " - YYYY-MM-DD"
+  const p3a = cleanName.match(/^(.+)\s+-\s+(\d{4}-\d{2}-\d{2})\s*-\s*(.*)$/)
+  if (p3a) {
+    result.artist = p3a[1].trim().replace(/[-–—\s]+$/, '').trim()
+    result.date = p3a[2]
+    if (p3a[3]) parseVenueStr(p3a[3])
     return result
   }
 
-  // Pattern 4: Artist YYYY-MM-DD [- ] rest  (no dash between artist and date)
-  const p4 = cleanName.match(/^(.+?)\s+(\d{4}-\d{2}-\d{2})\s*(?:-\s*)?(.*)$/)
+  // Pattern 3b: Artist - YYYY - Album Title (e.g. "Drive-By Truckers - 2003 - Decoration Day")
+  // This is an ALBUM not a live show — treat the third part as the album title
+  const p3b = cleanName.match(/^(.+)\s+-\s+(\d{4})\s+-\s+(.+)$/)
+  if (p3b) {
+    result.artist = p3b[1].trim().replace(/[-–—\s]+$/, '').trim()
+    result.releaseType = 'album'
+    result.albumTitle = p3b[3].trim()
+    result.year = p3b[2]
+    result.date = `${p3b[2]}-01-01`
+    return result
+  }
+
+  // Pattern 4: Artist YYYY-MM-DD [- ] rest  (no dash between artist and date, greedy artist)
+  const p4 = cleanName.match(/^(.+)\s+(\d{4}-\d{2}-\d{2})\s*(?:-\s*)?(.*)$/)
   if (p4) {
     result.artist = p4[1].trim().replace(/[-–—\s]+$/, '').trim()
     result.date = p4[2]
     if (p4[3]) parseVenueStr(p4[3])
     return result
+  }
+
+  // Pattern 5: Artist - Album Title (no date in folder, year may be in parens)
+  // e.g. "Allman Brothers Band - At Fillmore East (1971)", "Drive-By Truckers - A Blessing And A Curse"
+  const p5 = cleanName.match(/^(.+)\s+-\s+(.+)$/)
+  if (p5) {
+    result.artist = p5[1].trim().replace(/[-–—\s]+$/, '').trim()
+    result.releaseType = 'album'
+    const albumPart = p5[2].trim()
+    result.albumTitle = albumPart
+
+    // Extract year from trailing 'YY: "Fillmore West '71"
+    const tickYear = albumPart.match(/[''](\d{2})$/)
+    if (tickYear) {
+      const y = parseInt(tickYear[1])
+      const year = y < 50 ? `20${tickYear[1]}` : `19${tickYear[1]}`
+      result.year = year
+      result.date = `${year}-01-01`
+    } else if (extractedYear) {
+      result.year = extractedYear
+      result.date = `${extractedYear}-01-01`
+    }
+    return result
+  }
+
+  // Pattern 6: Just a name with no structure — use extracted year if available
+  if (extractedYear && !result.date) {
+    result.date = `${extractedYear}-01-01`
   }
 
   return result
@@ -296,16 +384,17 @@ export async function scanFolder(folderPath: string): Promise<ShowInfo> {
   const folderName = path.basename(resolvedPath)
   const parsedFolder = parseFolderName(folderName)
 
-  // Detect release type: if no date parsed and folder looks like "Album Title (Year)" → album
-  const hasDate = !!parsedFolder.date
+  // Detect release type — trust parseFolderName first, then fall back to heuristics
   const albumYearMatch = folderName.match(/\((\d{4})\)/) || folderName.match(/\[(\d{4})\]/)
-  const looksLikeAlbum = !hasDate && !!albumYearMatch
+  const looksLikeAlbum = parsedFolder.releaseType === 'album'
+    || (!parsedFolder.date && !!albumYearMatch)
   const releaseType: ReleaseType = looksLikeAlbum ? 'album' : 'live'
-  const albumYear = albumYearMatch ? albumYearMatch[1] : ''
-  // Strip year and quality junk for album title
-  const albumTitle = looksLikeAlbum
-    ? folderName.replace(/\s*\(.*?\)/g, '').replace(/\s*\[.*?\]/g, '').trim()
-    : ''
+  const albumYear = parsedFolder.year || (albumYearMatch ? albumYearMatch[1] : '')
+  // Album title: use parseFolderName result, or strip year/junk from folder name
+  const albumTitle = parsedFolder.albumTitle
+    || (looksLikeAlbum
+      ? folderName.replace(/\s*\(.*?\)/g, '').replace(/\s*\[.*?\]/g, '').trim()
+      : '')
 
   const show: ShowInfo = {
     folderPath: resolvedPath,
@@ -410,5 +499,53 @@ export async function scanFolder(folderPath: string): Promise<ShowInfo> {
   }
 
   show.tracks = tracks
+
+  // Enrich show info from file tags — album tag often has better venue/city/state than truncated folder names
+  const firstTaggedTrack = tracks.find(t => t.existingTags.album)
+  if (firstTaggedTrack?.existingTags.album) {
+    const albumStr = firstTaggedTrack.existingTags.album
+      .replace(/^live\s*phish\s*:\s*/i, '').trim()
+    const albumDateMatch = albumStr.match(/^(\d{4}[\/\-]\d{2}[\/\-]\d{2})\s*[-–]?\s*(.*)$/)
+    if (albumDateMatch) {
+      if (!show.date) show.date = albumDateMatch[1].replace(/\//g, '-')
+      const rest = albumDateMatch[2].trim()
+      if (rest) {
+        // Parse "Venue, City, ST" or "Venue - City, ST" directly
+        const clean = rest.replace(/\s*\[[^\]]*\]/g, '').replace(/\s*\([^)]*\)/g, '').trim()
+        let tagVenue = '', tagCity = '', tagState = ''
+        const m1 = clean.match(/^(.+?)\s*-\s*([^,\-]+),\s*([A-Z]{2,3})$/)
+        if (m1) {
+          tagVenue = m1[1].trim(); tagCity = m1[2].trim(); tagState = m1[3].trim()
+        } else {
+          const parts = clean.split(',').map((p: string) => p.trim()).filter(Boolean)
+          if (parts.length >= 3 && /^[A-Z]{2,3}$/.test(parts[parts.length - 1])) {
+            tagState = parts[parts.length - 1]
+            tagCity = parts[parts.length - 2]
+            tagVenue = parts.slice(0, parts.length - 2).join(', ')
+          } else if (parts.length >= 3) {
+            tagState = parts[parts.length - 1]
+            tagCity = parts[parts.length - 2]
+            tagVenue = parts.slice(0, parts.length - 2).join(', ')
+          } else if (parts.length === 2) {
+            tagVenue = parts[0]
+            const cs = parts[1].match(/^(.+?)\s+([A-Z]{2,3})$/)
+            if (cs) { tagCity = cs[1].trim(); tagState = cs[2] }
+            else tagCity = parts[1]
+          } else if (parts.length === 1) {
+            tagVenue = parts[0]
+          }
+        }
+        // Prefer tag data when folder data is missing or looks truncated
+        if (!show.venue && tagVenue) show.venue = tagVenue
+        if (tagCity && (!show.city || (show.city.length <= 4 && tagCity.toLowerCase().startsWith(show.city.toLowerCase()))))
+          show.city = tagCity
+        if (!show.state && tagState) show.state = tagState
+      }
+    }
+    // Also enrich artist from tags
+    if (!show.artist && firstTaggedTrack.existingTags.artist)
+      show.artist = firstTaggedTrack.existingTags.artist
+  }
+
   return show
 }

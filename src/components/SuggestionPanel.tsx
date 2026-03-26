@@ -52,10 +52,13 @@ export default function SuggestionPanel({ show, onClose, onApprove, onSkip, dest
     setMbSearching(true)
     setMbError(null)
     try {
-      // Prefer existing tag album title over folder-derived one for search accuracy
-      const searchAlbum = suggestion.originalShow?.files?.[0] ? '' : suggestion.albumTitle
-      const tagAlbum = (suggestion.originalShow as { existingTags?: { album?: string } })?.existingTags?.album || suggestion.albumTitle
-      const query = encodeURIComponent(`artist:"${suggestion.artist}" release:"${tagAlbum}"`)
+      // Build query based on release type
+      const isAlbumSearch = suggestion.releaseType === 'album'
+      // For albums: search by artist + album title. For live: search by artist + venue/date.
+      const tagAlbum = suggestion.albumTitle || suggestion.venue || ''
+      const query = isAlbumSearch
+        ? encodeURIComponent(`artist:"${suggestion.artist}" release:"${tagAlbum}"`)
+        : encodeURIComponent(`artist:"${suggestion.artist}" date:${suggestion.date?.slice(0,4) || ''} release:"${suggestion.venue || ''}"`)
       const res = await fetch(`https://musicbrainz.org/ws/2/release/?query=${query}&limit=5&fmt=json`, {
         headers: { 'User-Agent': 'TaperKit/1.0 (taperkit@local)' }
       })
@@ -68,11 +71,36 @@ export default function SuggestionPanel({ show, onClose, onApprove, onSkip, dest
         'cover-art-archive'?: { front: boolean }
       }>
       if (!releases?.length) { setMbError('No results found'); setMbSearching(false); return }
-      // Pick best match — prefer exact title match
-      const exactMatch = releases.find(r => r.title.toLowerCase() === tagAlbum.toLowerCase())
-      const best = exactMatch || releases[0]
+
+      // Pick best match:
+      // 1. Exact title match whose year matches our known year (original release, not a remaster)
+      // 2. Exact title match closest to our known year
+      // 3. Any exact title match
+      // 4. First result
+      const knownYear = suggestion.year || suggestion.date?.slice(0, 4) || ''
+      const exactMatches = releases.filter(r => r.title.toLowerCase() === tagAlbum.toLowerCase())
+      let best = releases[0]
+      if (exactMatches.length > 0) {
+        if (knownYear) {
+          // Prefer release whose year matches known year exactly
+          const yearMatch = exactMatches.find(r => r.date?.startsWith(knownYear))
+          if (yearMatch) {
+            best = yearMatch
+          } else {
+            // Pick closest year to known year
+            const sorted = exactMatches
+              .filter(r => r.date)
+              .sort((a, b) => Math.abs(parseInt(a.date!.slice(0,4)) - parseInt(knownYear)) - Math.abs(parseInt(b.date!.slice(0,4)) - parseInt(knownYear)))
+            best = sorted[0] || exactMatches[0]
+          }
+        } else {
+          best = exactMatches[0]
+        }
+      }
+
       const mbArtist = best['artist-credit']?.[0]?.artist?.name || best['artist-credit']?.[0]?.name || suggestion.artist
-      const mbYear = best.date ? best.date.slice(0, 4) : suggestion.year
+      // Keep existing year if we have one — MusicBrainz may return a remaster/reissue date
+      const mbYear = knownYear || (best.date ? best.date.slice(0, 4) : suggestion.year)
 
       // Try iTunes via local proxy (avoids CORS)
       let artworkUrl = ''
@@ -124,13 +152,19 @@ export default function SuggestionPanel({ show, onClose, onApprove, onSkip, dest
       if (!prev) return prev
       const updated = { ...prev, [field]: value }
       // Rebuild proposed folder name when key fields change
-      if (['date', 'venue', 'city', 'state'].includes(field)) {
-        const d = field === 'date' ? value : updated.date
-        const v = field === 'venue' ? value : updated.venue
-        const c = field === 'city' ? value : updated.city
-        const s = field === 'state' ? value : updated.state
-        const locationParts = [v, [c, s].filter(Boolean).join(', ')].filter(Boolean)
-        updated.proposedFolderName = [d, ...locationParts].filter(Boolean).join(' ')
+      if (['date', 'venue', 'city', 'state', 'albumTitle', 'year'].includes(field)) {
+        if (updated.releaseType === 'album') {
+          const title = field === 'albumTitle' ? value : updated.albumTitle
+          const yr = field === 'year' ? value : updated.year
+          updated.proposedFolderName = [title, yr ? `(${yr})` : ''].filter(Boolean).join(' ')
+        } else {
+          const d = field === 'date' ? value : updated.date
+          const v = field === 'venue' ? value : updated.venue
+          const c = field === 'city' ? value : updated.city
+          const s = field === 'state' ? value : updated.state
+          const locationParts = [v, [c, s].filter(Boolean).join(', ')].filter(Boolean)
+          updated.proposedFolderName = [d, ...locationParts].filter(Boolean).join(' ')
+        }
       }
       return updated
     })
@@ -357,7 +391,11 @@ export default function SuggestionPanel({ show, onClose, onApprove, onSkip, dest
                       : `d1-${trackNum} ${title}${ext}`
                     return { ...f, proposedFilename }
                   })
-                  return { ...prev, releaseType: t, proposedFiles: rebuiltFiles }
+                  // Rebuild folder name for release type
+                  const proposedFolderName = isAlbum
+                    ? [prev.albumTitle, prev.year ? `(${prev.year})` : ''].filter(Boolean).join(' ')
+                    : [prev.date, prev.venue, [prev.city, prev.state].filter(Boolean).join(', ')].filter(Boolean).join(' ')
+                  return { ...prev, releaseType: t, proposedFiles: rebuiltFiles, proposedFolderName }
                 })}
                   style={{ padding: '4px 12px', background: suggestion.releaseType === t ? 'var(--accent)' : 'var(--surface)', color: suggestion.releaseType === t ? '#1a1a1a' : 'var(--text-muted)', border: '1px solid var(--border)', borderRadius: '4px', fontWeight: suggestion.releaseType === t ? 600 : 400, fontSize: '11px', textTransform: 'uppercase', cursor: 'pointer' }}>
                   {t === 'live' ? '🎤 Live' : '💿 Album'}

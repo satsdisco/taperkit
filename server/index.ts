@@ -13,9 +13,13 @@ import {
   deduplicateShows,
   suggestShow,
   applyBatch,
+  normalizeArtist,
+  normalizeTitle,
   LibraryShow,
   LibraryShowSuggestion,
+  cleanTrackTitle,
 } from './library.js'
+import { normalizeUnicode } from './normalizeText.js'
 import { fetchArtistPhoto, generateShowPoster, saveArtwork, searchAlbumArt } from './artwork.js'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -154,9 +158,9 @@ app.post('/api/apply', async (req, res) => {
     if (shouldWriteTags && renameResult.success) {
       const ext = path.extname(renameResult.targetFilePath).toLowerCase()
       const tagData = {
-        artist: show.artist,
-        album: albumName,
-        title: track.title,
+        artist: normalizeArtist(show.artist),
+        album: normalizeUnicode(albumName),
+        title: normalizeTitle(track.title),
         tracknumber: String(track.track),
         discnumber: isAlbum ? '' : String(track.disc),
         date: isAlbum ? (show.year || '') : show.date,
@@ -245,8 +249,11 @@ app.post('/api/preview', (req, res) => {
 // GET /api/browse — open macOS Finder folder picker dialog
 app.get('/api/browse', (_req, res) => {
   try {
-    const script = `tell application "Finder" to set theFolder to choose folder with prompt "Choose a show folder"
-return POSIX path of theFolder`
+    const script = `tell application "Finder"
+activate
+set theFolder to choose folder with prompt "Choose a show folder"
+return POSIX path of theFolder
+end tell`
     const result = execSync(`osascript -e '${script.replace(/'/g, "'\\''")}'`, { encoding: 'utf-8' }).trim()
     return res.json({ path: result })
   } catch (err) {
@@ -308,6 +315,153 @@ app.get('/api/library/scan', async (req, res) => {
 })
 
 // POST /api/library/deduplicate
+// POST /api/library/merge-artists — merge duplicate artist folders that normalize to the same name
+app.post('/api/library/merge-artists', (req, res) => {
+  const { libraryRoot } = req.body as { libraryRoot: string }
+  if (!libraryRoot || !fs.existsSync(libraryRoot)) {
+    return res.status(400).json({ error: 'libraryRoot required and must exist' })
+  }
+
+  const results: Array<{ from: string; to: string; moved: string[]; status: string }> = []
+
+  try {
+    const artistDirs = fs.readdirSync(libraryRoot, { withFileTypes: true }).filter(e => e.isDirectory())
+
+    // Group dirs by their normalized artist name
+    const groups = new Map<string, string[]>()
+    for (const d of artistDirs) {
+      const key = normalizeArtist(d.name).toLowerCase()
+      const canonical = normalizeArtist(d.name)
+      if (!groups.has(key)) groups.set(key, [])
+      groups.get(key)!.push(d.name)
+    }
+
+    for (const [normKey, dirs] of groups) {
+      if (dirs.length <= 1) continue
+
+      // Pick canonical name — prefer the normalized form (normalizeArtist of each dir)
+      const canonical = normalizeArtist(dirs[0])
+      const canonicalPath = path.join(libraryRoot, canonical)
+
+      // Make sure canonical dir exists
+      fs.mkdirSync(canonicalPath, { recursive: true })
+
+      // Move all content from non-canonical dirs into canonical
+      for (const dir of dirs) {
+        if (dir === canonical) continue
+        const srcPath = path.join(libraryRoot, dir)
+        const moved: string[] = []
+        try {
+          const items = fs.readdirSync(srcPath, { withFileTypes: true })
+          for (const item of items) {
+            const src = path.join(srcPath, item.name)
+            const dst = path.join(canonicalPath, item.name)
+            if (!fs.existsSync(dst)) {
+              fs.renameSync(src, dst)
+              moved.push(item.name)
+            } else {
+              // Dest already exists — skip (don't overwrite, let user handle)
+              moved.push(`SKIPPED (conflict): ${item.name}`)
+            }
+          }
+          // Remove src dir if now empty
+          const remaining = fs.readdirSync(srcPath)
+          if (remaining.length === 0) fs.rmdirSync(srcPath)
+          results.push({ from: dir, to: canonical, moved, status: 'merged' })
+        } catch (err) {
+          results.push({ from: dir, to: canonical, moved, status: `error: ${(err as Error).message}` })
+        }
+      }
+    }
+  } catch (err) {
+    return res.status(500).json({ error: (err as Error).message })
+  }
+
+  return res.json({ results })
+})
+
+// POST /api/library/retag — walk existing library and write tags based on folder structure
+// artist = parent folder name, album = show folder name, title = filename sans disc/track prefix
+app.post('/api/library/retag', (req, res) => {
+  const { libraryRoot, dryRun } = req.body as { libraryRoot: string; dryRun?: boolean }
+  if (!libraryRoot || !fs.existsSync(libraryRoot)) {
+    return res.status(400).json({ error: 'libraryRoot required and must exist' })
+  }
+
+  res.setHeader('Content-Type', 'application/x-ndjson')
+  res.setHeader('Transfer-Encoding', 'chunked')
+  res.setHeader('X-Accel-Buffering', 'no')
+
+  const AUDIO_EXTS = ['.flac', '.mp3']
+  let tagged = 0, skipped = 0, errors = 0
+
+  try {
+    const artistDirs = fs.readdirSync(libraryRoot, { withFileTypes: true }).filter(e => e.isDirectory())
+    for (const artistDir of artistDirs) {
+      const artistName = normalizeArtist(artistDir.name)
+      const artistPath = path.join(libraryRoot, artistDir.name)
+      const albumDirs = fs.readdirSync(artistPath, { withFileTypes: true }).filter(e => e.isDirectory())
+
+      for (const albumDir of albumDirs) {
+        const albumPath = path.join(artistPath, albumDir.name)
+        // Parse date from album folder name if present
+        const dateMatch = albumDir.name.match(/^(\d{4}-\d{2}-\d{2})/)
+        const albumDate = dateMatch ? dateMatch[1] : albumDir.name.match(/\((\d{4})\)/)?.[1] || ''
+        const albumName = albumDir.name
+
+        // Walk files (possibly in disc subfolders)
+        const walkFiles = (dir: string, discNum = 1): void => {
+          const entries = fs.readdirSync(dir, { withFileTypes: true })
+          for (const entry of entries) {
+            const entryPath = path.join(dir, entry.name)
+            if (entry.isDirectory()) {
+              const discMatch = entry.name.match(/^(?:disc|disk|set|d|cd)\s*(\d+)/i)
+              walkFiles(entryPath, discMatch ? parseInt(discMatch[1]) : discNum)
+              continue
+            }
+            const ext = path.extname(entry.name).toLowerCase()
+            if (!AUDIO_EXTS.includes(ext)) continue
+
+            // Derive track title and number from filename using full cleanTrackTitle logic
+            const base = path.basename(entry.name, ext)
+            const trackNumMatch = base.match(/^(?:d\d+[-_])?(\d+)/)
+            const trackNum = trackNumMatch ? trackNumMatch[1].replace(/^0+/, '') || '0' : ''
+            // Use cleanTrackTitle to strip artist/album/disc/track prefixes from both filename and tag
+            const trackTitle = normalizeTitle(cleanTrackTitle(entry.name, ext) || base)
+
+            const tags = {
+              artist: normalizeArtist(artistName),
+              albumartist: normalizeArtist(artistName),
+              album: normalizeUnicode(albumName),
+              title: trackTitle,
+              tracknumber: trackNum,
+              discnumber: String(discNum),
+              date: albumDate,
+              comment: '',
+            }
+
+            if (!dryRun) {
+              const result = writeTags(entryPath, tags)
+              if (result.success) tagged++
+              else { errors++; res.write(JSON.stringify({ type: 'error', file: entry.name, error: result.error }) + '\n') }
+            } else {
+              tagged++
+            }
+          }
+        }
+
+        walkFiles(albumPath)
+        res.write(JSON.stringify({ type: 'progress', artist: artistName, album: albumName, tagged, errors }) + '\n')
+      }
+    }
+  } catch (err) {
+    res.write(JSON.stringify({ type: 'error', error: (err as Error).message }) + '\n')
+  }
+
+  res.write(JSON.stringify({ type: 'done', tagged, skipped, errors }) + '\n')
+  res.end()
+})
+
 app.post('/api/library/deduplicate', (req, res) => {
   const { shows } = req.body as { shows: LibraryShow[] }
   if (!shows || !Array.isArray(shows)) {
@@ -432,6 +586,8 @@ app.post('/api/artwork/save', (req, res) => {
   }
   if (!destDir || !dataUrl) return res.status(400).json({ error: 'destDir and dataUrl required' })
   try {
+    // Save cover.jpg (Jellyfin standard) + folder.jpg (TaperKit/Plex standard)
+    saveArtwork(path.join(destDir, 'cover.jpg'), dataUrl)
     saveArtwork(path.join(destDir, 'folder.jpg'), dataUrl)
     if (artistDir) {
       const artistArt = path.join(artistDir, 'folder.jpg')

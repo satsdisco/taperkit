@@ -3,6 +3,7 @@ import path from 'path'
 
 export interface TagData {
   artist: string
+  albumartist?: string
   album: string
   title: string
   tracknumber: string
@@ -36,6 +37,7 @@ export function writeFLACTags(filePath: string, tags: TagData): void {
   // Use execFileSync with array args — no shell interpretation, no quoting issues
   const tagMap: Record<string, string> = {
     ARTIST: tags.artist,
+    ALBUMARTIST: tags.albumartist ?? tags.artist,
     ALBUM: tags.album,
     TITLE: tags.title,
     TRACKNUMBER: tags.tracknumber,
@@ -57,6 +59,7 @@ export function writeMP3Tags(filePath: string, tags: TagData): void {
   // Use execFileSync with array args
   const args: string[] = []
   if (tags.artist) args.push('-a', tags.artist)
+  if (tags.albumartist ?? tags.artist) args.push('--TPE2', tags.albumartist ?? tags.artist)
   if (tags.album) args.push('-A', tags.album)
   if (tags.title) args.push('-t', tags.title)
   if (tags.tracknumber) {

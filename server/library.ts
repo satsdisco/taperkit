@@ -3,6 +3,7 @@ import path from 'path'
 import * as mm from 'music-metadata'
 import { parseFolderName, parseDiscFromFolder } from './scanner.js'
 import { writeTags, checkToolsAvailable } from './tagger.js'
+import { normalizeUnicode } from './normalizeText.js'
 
 const AUDIO_EXTENSIONS = ['.flac', '.mp3', '.wav', '.aac', '.ogg', '.m4a', '.ape', '.wv']
 
@@ -23,14 +24,31 @@ const ARTIST_NORM: Record<string, string> = {
   'phish': 'Phish',
   'phsh': 'Phish',
   'ph': 'Phish',
+  'live phish': 'Phish',
+  'livephish': 'Phish',
+  'allman brothers band': 'The Allman Brothers Band',
+  'the allman brothers band': 'The Allman Brothers Band',
+  'allman brothers': 'The Allman Brothers Band',
+  'the allman brothers': 'The Allman Brothers Band',
+  // moe. — canonical name includes the period
+  'moe': 'moe.',
+  'moe.': 'moe.',
 }
 
 export function normalizeArtist(raw: string): string {
   if (!raw) return raw
+  // Normalize ALL Unicode lookalikes (hyphens, quotes, spaces, etc.)
+  const normalized = normalizeUnicode(raw)
   // Strip trailing dash/punctuation that creeps in from folder names
-  const cleaned = raw.trim().replace(/[-–—\s]+$/, '').trim()
+  const cleaned = normalized.trim().replace(/[-–—\s]+$/, '').trim()
   const key = cleaned.toLowerCase()
   return ARTIST_NORM[key] ?? cleaned
+}
+
+/** Normalize a song title: Unicode cleanup, then trim */
+export function normalizeTitle(raw: string): string {
+  if (!raw) return raw
+  return normalizeUnicode(raw)
 }
 
 export interface LibraryFile {
@@ -248,43 +266,74 @@ async function buildShow(
   }
   const artist = normalizeArtist(folderArtist || tagArtist || artistHint || '')
 
-  // Detect release type
+  // Detect release type — trust parseFolderName first, then fall back to heuristics
   const folderNameClean = path.basename(folderPath)
   const albumYearMatch = folderNameClean.match(/\((\d{4})\)/) || folderNameClean.match(/\[(\d{4})\]/)
   const hasDate = !!parsed.date
-  const looksLikeAlbum = !hasDate && !!albumYearMatch
+  const looksLikeAlbum = parsed.releaseType === 'album' || (!hasDate && !!albumYearMatch)
   const releaseType: 'live' | 'album' = looksLikeAlbum ? 'album' : 'live'
-  const albumYear = albumYearMatch ? albumYearMatch[1] : (parsed.date ? parsed.date.slice(0, 4) : '')
-  const albumTitleParsed = looksLikeAlbum
-    ? folderNameClean.replace(/\s*\(.*?\)/g, '').replace(/\s*\[.*?\]/g, '').replace(new RegExp(`^${artist}\\s*-?\\s*`, 'i'), '').trim()
-    : ''
+  const albumYear = parsed.year || (albumYearMatch ? albumYearMatch[1] : (parsed.date ? parsed.date.slice(0, 4) : ''))
+  const albumTitleParsed = parsed.albumTitle
+    || (looksLikeAlbum
+      ? folderNameClean.replace(/\s*\{[^}]*\}/g, '').replace(/\s*\(.*?\)/g, '').replace(/\s*\[.*?\]/g, '').replace(new RegExp(`^${artist}\\s*-?\\s*`, 'i'), '').trim()
+      : '')
 
-  // Normalise date: accept YYYY-MM-DD, YYYY/MM/DD, YYYYMMDD
+  // Normalise date: accept YYYY-MM-DD, YYYY/MM/DD, YYYYMMDD, MM-DD-YYYY, MM/DD/YYYY
   function normalizeDate(raw: string): string {
     if (!raw) return ''
+    // YYYY-MM-DD or YYYY/MM/DD
     const m1 = raw.match(/(\d{4})[\/\-](\d{2})[\/\-](\d{2})/)
     if (m1) return `${m1[1]}-${m1[2]}-${m1[3]}`
-    const m2 = raw.match(/(\d{4})(\d{2})(\d{2})/)
+    // YYYYMMDD
+    const m2 = raw.match(/^(\d{4})(\d{2})(\d{2})$/)
     if (m2) return `${m2[1]}-${m2[2]}-${m2[3]}`
+    // MM-DD-YYYY or MM/DD/YYYY (LivePhish folder naming)
+    const m3 = raw.match(/^(\d{2})[\/\-](\d{2})[\/\-](\d{4})/)
+    if (m3) return `${m3[3]}-${m3[1]}-${m3[2]}`
     return raw
   }
 
   // Extract date + venue/city from album tag like "2008/04/18 The Georgia Theatre, Athens, GA"
+  // or LivePhish format: "LivePhish: 1998/04/03 - Nassau Coliseum - Uniondale, NY"
   let tagDate = tagsFromFile.date || ''
   let tagVenue = ''
   let tagCity = ''
   let tagState = ''
   if (tagsFromFile.album) {
-    const albumDateMatch = tagsFromFile.album.match(/^(\d{4}[\/\-]\d{2}[\/\-]\d{2})\s*(.*)$/)
+    // Strip "LivePhish: " or similar prefixes before parsing
+    const albumStr = tagsFromFile.album.replace(/^live\s*phish\s*:\s*/i, '').trim()
+    const albumDateMatch = albumStr.match(/^(\d{4}[\/\-]\d{2}[\/\-]\d{2})\s*[-–]?\s*(.*)$/)
     if (albumDateMatch) {
       if (!tagDate) tagDate = albumDateMatch[1]
       const rest = albumDateMatch[2].trim()
       if (rest) {
-        // parse "The Georgia Theatre, Athens, GA"
-        const albumParsed = parseFolderName(rest)
-        tagVenue = albumParsed.venue || ''
-        tagCity = albumParsed.city || ''
-        tagState = albumParsed.state || ''
+        // Parse "Venue - City, ST" or "Venue, City, ST" or "Venue, City" directly
+        // (can't use parseFolderName — it expects a full folder name with leading date)
+        const venueCity = rest
+          .replace(/\s*\[[^\]]*\]/g, '').replace(/\s*\([^)]*\)/g, '').trim()
+        const m1 = venueCity.match(/^(.+?)\s*-\s*([^,\-]+),\s*([A-Z]{2,3})$/)
+        if (m1) {
+          tagVenue = m1[1].trim(); tagCity = m1[2].trim(); tagState = m1[3].trim()
+        } else {
+          const parts = venueCity.split(',').map((p: string) => p.trim()).filter(Boolean)
+          if (parts.length >= 3 && /^[A-Z]{2,3}$/.test(parts[parts.length - 1])) {
+            tagState = parts[parts.length - 1]
+            tagCity = parts[parts.length - 2]
+            tagVenue = parts.slice(0, parts.length - 2).join(', ')
+          } else if (parts.length >= 3) {
+            // "Venue, City, Country" — no 2-letter state
+            tagState = parts[parts.length - 1]
+            tagCity = parts[parts.length - 2]
+            tagVenue = parts.slice(0, parts.length - 2).join(', ')
+          } else if (parts.length === 2) {
+            tagVenue = parts[0]
+            const cityState = parts[1].match(/^(.+?)\s+([A-Z]{2,3})$/)
+            if (cityState) { tagCity = cityState[1].trim(); tagState = cityState[2] }
+            else tagCity = parts[1]
+          } else if (parts.length === 1) {
+            tagVenue = parts[0]
+          }
+        }
       }
     }
   }
@@ -294,8 +343,12 @@ async function buildShow(
   const folderVenue = parsedVenue || parsed.venue || ''
   const isPlaceholderVenue = /^unknown\s*venue$/i.test(folderVenue.trim())
   const venue = (!folderVenue || isPlaceholderVenue) ? (tagVenue || folderVenue) : folderVenue
-  const city = (!isPlaceholderVenue && (parsed.city || parsedVenue)) ? (parsed.city || '') : (tagCity || parsed.city || '')
-  const state = (!isPlaceholderVenue && (parsed.state || parsedVenue)) ? (parsed.state || '') : (tagState || parsed.state || '')
+  // Prefer tag city/state if folder city is missing OR suspiciously short (e.g. "Sun" truncated from "Sunrise")
+  const folderCity = parsed.city || ''
+  const folderState = parsed.state || ''
+  const folderCityTruncated = folderCity.length > 0 && folderCity.length <= 3 && tagCity && tagCity.toLowerCase().startsWith(folderCity.toLowerCase())
+  const city = (folderCityTruncated || !folderCity || isPlaceholderVenue) ? (tagCity || folderCity) : folderCity
+  const state = (!folderState || isPlaceholderVenue) ? (tagState || folderState) : folderState
 
   const hasFlac = files.some(f => path.extname(f).toLowerCase() === '.flac')
   const hasMp3 = files.some(f => path.extname(f).toLowerCase() === '.mp3')
@@ -544,7 +597,7 @@ export function deduplicateShows(shows: LibraryShow[]): {
   return { unique, duplicateGroups }
 }
 
-function cleanTrackTitle(filename: string, ext: string): string {
+export function cleanTrackTitle(filename: string, ext: string): string {
   const base = path.basename(filename, ext)
   let s = base
     // taper prefix + YYYY-MM-DD + disc + track: gd1977-05-08d1t01
@@ -557,8 +610,17 @@ function cleanTrackTitle(filename: string, ext: string): string {
     .replace(/^d\d+[-_]?t\d+[-_]?\s*/i, '')   // d1_t01, d1t01
     .replace(/^d\d+[-_]\d+[-_]?\s*/i, '')      // d1-01, d1_01
     .replace(/^d\d{3,4}\s*[-_]?\s*/i, '')      // d201
+    // N-NN Title (disc-track without d prefix: "1-01 Carini" → "Carini")
+    .replace(/^\d-\d{2}\s+/, '')
     // 01 - Title or 01_Title
     .replace(/^\d{1,3}\s*[-_.]\s*/, '')
+    // double track prefix: "01 01 – Title" or "01 01 - Title" → "Title"
+    .replace(/^\d{1,3}\s+\d{1,3}\s*[–—-]\s*/, '')
+    // bare leading number leftover: "01 Carini" → "Carini"
+    .replace(/^\d{1,2}\s+(?=[A-Z])/i, '')
+    // "Drive-By Truckers - 01 - Title" or "Drive-By Truckers - Title" — strip leading artist+sep
+    // Match: anything up to " - " followed by optional "NN - "
+    .replace(/^.+?\s+-\s+(?:\d{1,3}\s+-\s+)?(?=\S)/, '')
 
   // After stripping disc/track prefix, YYYY-prefixed remainder may be exposed:
   // "2002 - 10-05d1t01 Hot Air Balloon" or "2007 - 11-01d1t01-Astronaut"
@@ -588,12 +650,31 @@ export function suggestShow(show: LibraryShow): LibraryShowSuggestion {
     ? [albumTitle, year ? `(${year})` : ''].filter(Boolean).join(' ')
     : [date, venue, [city, state].filter(Boolean).join(', ')].filter(Boolean).join(' ')
 
-  const proposedFiles = show.files.map((f, i) => {
-    const trackNum = String(i + 1).padStart(2, '0')
-    const cleanTitle = cleanTrackTitle(f.filename, f.ext) || `Track ${i + 1}`
+  // Track counter per disc for proper track numbering
+  const discTrackCounters = new Map<number, number>()
+  let globalTrack = 0
+
+  const proposedFiles = show.files.map((f) => {
+    const base = path.basename(f.filename, f.ext)
+
+    // Detect disc from filename: "2-01 Title", "d2-01 Title", "d2_01 Title"
+    const discMatch = base.match(/^(?:d)?(\d)-(\d{2})\s/) || base.match(/^d(\d+)[_-](\d+)/)
+    let disc = 1
+    let track = 0
+
+    if (discMatch) {
+      disc = parseInt(discMatch[1], 10)
+      track = parseInt(discMatch[2], 10)
+    } else {
+      globalTrack++
+      track = globalTrack
+    }
+
+    const cleanTitle = cleanTrackTitle(f.filename, f.ext) || `Track ${track}`
+    const trackStr = String(track).padStart(2, '0')
     const proposedFilename = isAlbum
-      ? `${trackNum} ${cleanTitle}${f.ext}`
-      : `d1-${trackNum} ${cleanTitle}${f.ext}`
+      ? `${trackStr} ${cleanTitle}${f.ext}`
+      : `d${disc}-${trackStr} ${cleanTitle}${f.ext}`
     return { originalFilename: f.filename, proposedFilename }
   })
 
@@ -615,7 +696,12 @@ export function suggestShow(show: LibraryShow): LibraryShowSuggestion {
 }
 
 function sanitize(str: string): string {
-  return str.replace(/[\\/:*?"<>|]/g, '-').replace(/\s+/g, ' ').trim()
+  return str
+    // Normalize all Unicode hyphen/dash variants to ASCII hyphen
+    .replace(/[\u2010\u2011\u2012\u2013\u2014\u2015\u2212\uFE58\uFE63\uFF0D]/g, '-')
+    .replace(/[\\/:*?"<>|]/g, '-')
+    .replace(/\s+/g, ' ')
+    .trim()
 }
 
 export async function applyBatch(
@@ -651,11 +737,13 @@ export async function applyBatch(
         if (ext === '.flac' || ext === '.mp3') {
           const toolAvailable = ext === '.flac' ? tools.metaflac : tools.id3v2
           if (toolAvailable) {
-            const trackTitle = path.basename(proposed.proposedFilename, ext)
-              .replace(/^d\d+[-_]\d+\s*/, '').replace(/^\d+\s*/, '').trim()
+            const trackTitle = normalizeTitle(
+              path.basename(proposed.proposedFilename, ext)
+                .replace(/^d\d+[-_]\d+\s*/, '').replace(/^\d+\s*/, '').trim()
+            )
             writeTags(destFilePath, {
-              artist: suggestion.artist,
-              album: albumName,
+              artist: normalizeArtist(suggestion.artist),
+              album: normalizeUnicode(albumName),
               title: trackTitle,
               tracknumber: String(i + 1),
               discnumber: isAlbum ? '' : '1',
@@ -683,6 +771,12 @@ export async function applyBatch(
             }
           }
         } catch { /* skip unreadable dirs */ }
+      }
+      // Ensure cover.jpg always exists (Jellyfin standard) — copy from folder.jpg if needed
+      const coverJpg = path.join(destDir, 'cover.jpg')
+      const folderJpg = path.join(destDir, 'folder.jpg')
+      if (!fs.existsSync(coverJpg) && fs.existsSync(folderJpg)) {
+        fs.copyFileSync(folderJpg, coverJpg)
       }
 
       onResult({ showId: suggestion.showId, success: true, destinationPath: destDir, filesProcessed })

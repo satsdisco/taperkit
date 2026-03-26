@@ -1,5 +1,6 @@
 import fs from 'fs'
 import path from 'path'
+import { normalizeUnicode } from './normalizeText.js'
 
 export interface RenameTarget {
   sourceFilePath: string
@@ -28,8 +29,8 @@ export interface RenameResult {
 }
 
 function sanitizePathComponent(str: string): string {
-  // Remove characters that are invalid in file/folder names on macOS/Windows
-  return str
+  // Normalize Unicode lookalikes first, then remove characters invalid in file/folder names
+  return normalizeUnicode(str)
     .replace(/[\\/:*?"<>|]/g, '-')
     .replace(/\s+/g, ' ')
     .trim()
