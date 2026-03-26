@@ -250,6 +250,8 @@ export function parseFolderName(folderName: string): Partial<ShowInfo> {
   cleanName = cleanName.replace(/^Live\s+Phish\s*-?\s*/i, '').trim()
 
   // === General date normalization ===
+  // Normalise dot dates: 1969.07.26 → 1969-07-26
+  cleanName = cleanName.replace(/(\d{4})\.(\d{2})\.(\d{2})/g, '$1-$2-$3')
   // Normalise underscore dates: 1999_09_24 → 1999-09-24
   cleanName = cleanName.replace(/^(\d{4})_(\d{2})_(\d{2})/, '$1-$2-$3')
   // Normalise MM_DD_YY or MM_ D_YY (with optional spaces) → YYYY-MM-DD

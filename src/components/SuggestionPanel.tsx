@@ -98,7 +98,13 @@ export default function SuggestionPanel({ show, onClose, onApprove, onSkip, dest
         }
       }
 
-      const mbArtist = best['artist-credit']?.[0]?.artist?.name || best['artist-credit']?.[0]?.name || suggestion.artist
+      const mbArtistRaw = best['artist-credit']?.[0]?.artist?.name || best['artist-credit']?.[0]?.name || ''
+      // Only use MB artist if it loosely matches the one we already have (from folder/tags).
+      // This prevents "Marvin Gaye" → "Scorpions" when MB returns a wrong match.
+      const existingArtist = suggestion.artist.toLowerCase().replace(/[^a-z0-9]/g, '')
+      const mbArtistNorm = mbArtistRaw.toLowerCase().replace(/[^a-z0-9]/g, '')
+      const artistMatches = !existingArtist || !mbArtistNorm || existingArtist.includes(mbArtistNorm) || mbArtistNorm.includes(existingArtist)
+      const mbArtist = artistMatches ? (mbArtistRaw || suggestion.artist) : suggestion.artist
       // Keep existing year if we have one — MusicBrainz may return a remaster/reissue date
       const mbYear = knownYear || (best.date ? best.date.slice(0, 4) : suggestion.year)
 
