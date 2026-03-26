@@ -88,6 +88,9 @@ export interface LibraryShow {
   hasFlac: boolean
   hasMp3: boolean
   tagStatus: 'full' | 'partial' | 'none'
+  albumTitle?: string
+  year?: string
+  releaseType?: ReleaseType
   alreadyDone: boolean
   destinationPath?: string
   files: LibraryFile[]

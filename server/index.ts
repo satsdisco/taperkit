@@ -314,6 +314,43 @@ app.get('/api/library/scan', async (req, res) => {
   res.end()
 })
 
+// POST /api/library/cleanup-source — move processed source folders to .taperkit-trash
+app.post('/api/library/cleanup-source', (req, res) => {
+  const { sourcePaths } = req.body as { sourcePaths: string[] }
+  if (!sourcePaths || !Array.isArray(sourcePaths) || sourcePaths.length === 0) {
+    return res.status(400).json({ error: 'sourcePaths[] required' })
+  }
+
+  const results: Array<{ path: string; status: string; trashPath?: string }> = []
+
+  for (const srcPath of sourcePaths) {
+    if (!fs.existsSync(srcPath)) {
+      results.push({ path: srcPath, status: 'not found' })
+      continue
+    }
+    try {
+      // Put .taperkit-trash in the parent of the source folder
+      const parentDir = path.dirname(srcPath)
+      const trashDir = path.join(parentDir, '.taperkit-trash')
+      fs.mkdirSync(trashDir, { recursive: true })
+      const folderName = path.basename(srcPath)
+      // Handle name collisions in trash
+      let trashDest = path.join(trashDir, folderName)
+      let suffix = 1
+      while (fs.existsSync(trashDest)) {
+        trashDest = path.join(trashDir, `${folderName}_${suffix}`)
+        suffix++
+      }
+      fs.renameSync(srcPath, trashDest)
+      results.push({ path: srcPath, status: 'trashed', trashPath: trashDest })
+    } catch (err) {
+      results.push({ path: srcPath, status: `error: ${(err as Error).message}` })
+    }
+  }
+
+  return res.json({ results })
+})
+
 // POST /api/library/deduplicate
 // POST /api/library/merge-artists — merge duplicate artist folders that normalize to the same name
 app.post('/api/library/merge-artists', (req, res) => {

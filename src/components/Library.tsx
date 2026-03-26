@@ -18,7 +18,7 @@ const DEFAULT_SOURCES = {
 }
 
 type Step = 'config' | 'scanning' | 'results' | 'applying'
-type FilterTab = 'all' | 'attention' | 'duplicates' | 'ready' | 'done'
+type FilterTab = 'all' | 'attention' | 'duplicates' | 'ready' | 'done' | 'in-library'
 
 function HealthBadge({ score }: { score: number }) {
   const [emoji, color] =
@@ -59,6 +59,9 @@ export default function Library() {
   const [applyResults, setApplyResults] = useState<BatchApplyResult[]>([])
   const [applyDone, setApplyDone] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [cleaningUp, setCleaningUp] = useState(false)
+  const [cleanupResults, setCleanupResults] = useState<Array<{ path: string; status: string }>>([])
+  const [showPostApplyCleanup, setShowPostApplyCleanup] = useState(false)
   const esRef = useRef<EventSource | null>(null)
 
   const browse = async (field: 'destination' | number) => {
@@ -272,6 +275,33 @@ export default function Library() {
       setError(err instanceof Error ? err.message : 'Apply failed')
     } finally {
       setApplyDone(true)
+      setShowPostApplyCleanup(true)
+    }
+  }
+
+  // Cleanup source folders (move to .taperkit-trash)
+  const cleanupSources = async (sourcePaths: string[]) => {
+    if (sourcePaths.length === 0) return
+    setCleaningUp(true)
+    setCleanupResults([])
+    try {
+      const res = await fetch('/api/library/cleanup-source', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sourcePaths }),
+      })
+      const data = await res.json()
+      setCleanupResults(data.results || [])
+      // Remove cleaned-up shows from list
+      const trashedPaths = new Set((data.results || []).filter((r: { status: string }) => r.status === 'trashed').map((r: { path: string }) => r.path))
+      if (trashedPaths.size > 0) {
+        setShows(prev => prev.filter(s => !trashedPaths.has(s.folderPath)))
+      }
+    } catch (err) {
+      setCleanupResults([{ path: 'all', status: `error: ${err instanceof Error ? err.message : String(err)}` }])
+    } finally {
+      setCleaningUp(false)
+      setShowPostApplyCleanup(false)
     }
   }
 
@@ -292,11 +322,13 @@ export default function Library() {
       case 'duplicates': return shows.filter(s => !s.alreadyDone && dupShowIdSet.has(s.id))
       case 'ready': return shows.filter(s => !s.alreadyDone && s.healthScore >= 70)
       case 'done': return shows.filter(s => s.alreadyDone)
+      case 'in-library': return shows.filter(s => s.alreadyDone)
       default: return shows.filter(s => !s.alreadyDone)
     }
   })()
   filteredShowsRef.current = filteredShows
 
+  const inLibraryCount = shows.filter(s => s.alreadyDone).length
   const doneCount = shows.filter(s => s.alreadyDone).length
   const needsAttentionCount = shows.filter(s => !s.alreadyDone && s.healthScore < 70).length
   const readyCount = shows.filter(s => !s.alreadyDone && s.healthScore >= 70).length
@@ -568,6 +600,7 @@ export default function Library() {
                 { id: 'attention', label: `Needs Attention (${needsAttentionCount})` },
                 { id: 'duplicates', label: `Duplicates (${dupeShowCount})` },
                 { id: 'ready', label: `Ready (${readyCount})` },
+                { id: 'in-library', label: `📁 In Library (${inLibraryCount})` },
                 { id: 'done', label: `✅ Done (${doneCount})` },
               ] as const
             ).map(tab => (
@@ -590,6 +623,91 @@ export default function Library() {
               </button>
             ))}
           </div>
+
+          {/* Cleanup banner for in-library tab */}
+          {filter === 'in-library' && filteredShows.length > 0 && (
+            <div
+              style={{
+                background: 'rgba(33,150,243,0.08)',
+                border: '1px solid rgba(33,150,243,0.3)',
+                borderRadius: '8px',
+                padding: '12px 16px',
+                marginBottom: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+              }}
+            >
+              <span style={{ fontSize: '13px', color: 'var(--text)' }}>
+                These {filteredShows.length} items already exist in your library. Source folders can be safely trashed.
+              </span>
+              <button
+                className="btn-secondary"
+                disabled={cleaningUp}
+                onClick={() => cleanupSources(filteredShows.map(s => s.folderPath))}
+                style={{ fontSize: '12px', padding: '4px 12px', flexShrink: 0, marginLeft: 'auto' }}
+              >
+                {cleaningUp ? 'Cleaning up...' : `🗑 Trash All (${filteredShows.length})`}
+              </button>
+            </div>
+          )}
+
+          {/* Post-apply cleanup prompt */}
+          {showPostApplyCleanup && (
+            <div
+              style={{
+                background: 'rgba(76,175,80,0.08)',
+                border: '1px solid var(--success)',
+                borderRadius: '8px',
+                padding: '12px 16px',
+                marginBottom: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+              }}
+            >
+              <span style={{ fontSize: '13px', color: 'var(--text)' }}>
+                ✅ Apply complete! Clean up source folders for processed shows?
+              </span>
+              <button
+                className="btn-primary"
+                disabled={cleaningUp}
+                onClick={() => {
+                  const donePaths = shows.filter(s => s.alreadyDone && s.folderPath).map(s => s.folderPath)
+                  cleanupSources(donePaths)
+                }}
+                style={{ fontSize: '12px', padding: '4px 12px', flexShrink: 0, marginLeft: 'auto' }}
+              >
+                {cleaningUp ? 'Cleaning up...' : '🗑 Trash Source Folders'}
+              </button>
+              <button
+                className="btn-secondary"
+                onClick={() => setShowPostApplyCleanup(false)}
+                style={{ fontSize: '12px', padding: '4px 12px', flexShrink: 0 }}
+              >
+                Skip
+              </button>
+            </div>
+          )}
+
+          {/* Cleanup results */}
+          {cleanupResults.length > 0 && (
+            <div
+              style={{
+                background: 'var(--surface)',
+                border: '1px solid var(--border)',
+                borderRadius: '8px',
+                padding: '12px 16px',
+                marginBottom: '12px',
+                fontSize: '12px',
+              }}
+            >
+              <div style={{ fontWeight: 600, marginBottom: '6px' }}>
+                Cleanup results: {cleanupResults.filter(r => r.status === 'trashed').length} trashed, {cleanupResults.filter(r => r.status !== 'trashed').length} skipped/errors
+              </div>
+              <button className="btn-secondary" style={{ fontSize: '11px', padding: '2px 8px' }} onClick={() => setCleanupResults([])}>Dismiss</button>
+            </div>
+          )}
 
           {/* Show list */}
           <ShowList
@@ -765,6 +883,14 @@ function ShowRow({ show, dupInfo, isApproved, isSkipped, onReview }: ShowRowProp
               }}
             >
               {dupInfo.isWinner ? `Winner (${dupInfo.winnerReason})` : 'Duplicate'}
+            </span>
+          )}
+          {show.alreadyDone && (
+            <span
+              title={show.destinationPath ? `In library: ${show.destinationPath}` : 'Already in library'}
+              style={{ fontSize: '10px', padding: '1px 6px', borderRadius: '10px', background: 'rgba(33,150,243,0.15)', color: '#2196f3', border: '1px solid rgba(33,150,243,0.3)', fontWeight: 600 }}
+            >
+              📁 In Library
             </span>
           )}
           {isApproved && (
