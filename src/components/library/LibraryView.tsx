@@ -363,7 +363,12 @@ export default function LibraryView({ libraryPath, onLibraryPathChange, onSwitch
   }
 
   const cleanupSources = async (sourcePaths: string[]) => {
-    if (sourcePaths.length === 0) return
+    if (sourcePaths.length === 0) {
+      console.warn('[TaperKit] cleanupSources called with empty paths')
+      setShowPostApplyCleanup(false)
+      return
+    }
+    console.log('[TaperKit] Trashing', sourcePaths.length, 'folders:', sourcePaths)
     setCleaningUp(true)
     setCleanupResults([])
     try {
@@ -373,6 +378,7 @@ export default function LibraryView({ libraryPath, onLibraryPathChange, onSwitch
         body: JSON.stringify({ sourcePaths }),
       })
       const data = await res.json()
+      console.log('[TaperKit] Cleanup response:', data)
       setCleanupResults(data.results || [])
       const trashedPaths = new Set(
         (data.results || [])
@@ -383,6 +389,7 @@ export default function LibraryView({ libraryPath, onLibraryPathChange, onSwitch
         setShows(prev => prev.filter(s => !trashedPaths.has(s.folderPath)))
       }
     } catch (err) {
+      console.error('[TaperKit] Cleanup failed:', err)
       setCleanupResults([{ path: 'all', status: `error: ${err instanceof Error ? err.message : String(err)}` }])
     } finally {
       setCleaningUp(false)

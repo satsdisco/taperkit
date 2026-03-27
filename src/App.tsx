@@ -72,7 +72,7 @@ export default function App() {
           style={{
             backgroundColor: 'var(--surface)',
             borderBottom: '1px solid var(--border)',
-            padding: '0 24px',
+            padding: '0 24px 0 80px',
             height: '52px',
             display: 'flex',
             alignItems: 'stretch',

@@ -174,12 +174,18 @@ export default function SuggestionPanel({ show, onClose, onApprove, onSkip, dest
 
       // Guard: only accept MB title if it reasonably matches the existing albumTitle.
       // If existing albumTitle is set and MB returns something completely different, keep ours.
+      // Check BOTH directions: existing words in MB title AND MB words in existing title.
       const existingAlbumTitle = suggestion.albumTitle || ''
       const mbTitleLower = best.title.toLowerCase()
-      const existingWords = existingAlbumTitle.toLowerCase().split(/\s+/).filter(w => w.length > 2)
+      const existingLower = existingAlbumTitle.toLowerCase()
+      const existingWords = existingLower.split(/\s+/).filter(w => w.length > 2)
+      const mbWords = mbTitleLower.split(/\s+/).filter(w => w.length > 2)
+      // Bidirectional check: titles should be substantially similar, not just one containing a word from the other
+      const forwardMatch = existingWords.length === 0 || existingWords.some(w => mbTitleLower.includes(w))
+      const reverseMatch = mbWords.length === 0 || mbWords.every(w => existingLower.includes(w))
       const mbTitleMatchesExisting =
         !existingAlbumTitle ||
-        existingWords.some(w => mbTitleLower.includes(w))
+        (forwardMatch && reverseMatch)
       const acceptedAlbumTitle = mbTitleMatchesExisting ? best.title : existingAlbumTitle
       const acceptedFolderName = [acceptedAlbumTitle, mbYear ? `(${mbYear})` : ''].filter(Boolean).join(' ')
 
