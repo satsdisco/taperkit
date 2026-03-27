@@ -600,6 +600,10 @@ export function deduplicateShows(shows: LibraryShow[]): {
 export function cleanTrackTitle(filename: string, ext: string): string {
   const base = path.basename(filename, ext)
   let s = base
+    // Strip embedded format/quality suffixes: .flac24, .flac16, .flac, .V0, .320, .mp3 etc.
+    .replace(/\.(?:flac\d*|mp3|wav|aac|ogg|m4a|v\d+|\d{3})\s*$/i, '')
+    // Strip catalog prefix: A071_, B002_, etc. (letter(s) + digits + underscore before track number)
+    .replace(/^[A-Z]{1,4}\d{2,5}[_\s]+/i, '')
     // taper prefix + YYYY-MM-DD + disc + track: gd1977-05-08d1t01
     .replace(/^[a-z]{2,10}\d{4}-\d{2}-\d{2}d\d+t\d+[-_]?\s*/i, '')
     // taper prefix + date + disc + track: spacebacon240127d1_01_Title or sb2024-01-27d1t01Title
@@ -642,6 +646,15 @@ export function cleanTrackTitle(filename: string, ext: string): string {
     // replace remaining underscores with spaces
     .replace(/[_]+/g, ' ')
     .trim()
+
+  // Title-case if ALL CAPS (e.g. "NEW RIVER TRAIN" → "New River Train")
+  if (s.length > 2 && s === s.toUpperCase() && /[A-Z]/.test(s)) {
+    const minorWords = new Set(['a', 'an', 'the', 'and', 'but', 'or', 'nor', 'for', 'yet', 'so', 'in', 'on', 'at', 'to', 'of', 'by', 'up', 'is'])
+    s = s.toLowerCase().replace(/\b\w+/g, (word, idx) => {
+      if (idx === 0 || !minorWords.has(word)) return word.charAt(0).toUpperCase() + word.slice(1)
+      return word
+    })
+  }
 
   return s
 }
