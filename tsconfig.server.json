@@ -10,7 +10,9 @@
     "resolveJsonModule": true,
     "allowSyntheticDefaultImports": true,
     "outDir": "./dist/server",
-    "rootDir": "./server"
+    "rootDir": "./server",
+    "allowImportingTsExtensions": false,
+    "noEmit": false
   },
   "include": ["server/**/*"],
   "exclude": ["node_modules", "dist"]

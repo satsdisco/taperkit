@@ -2,3 +2,7 @@ node_modules/
 dist/
 .taperkit-recents.json
 *.js.map
+
+# Build output
+release/
+assets/taperkit.iconset/
