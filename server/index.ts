@@ -709,8 +709,9 @@ if (fs.existsSync(distPath)) {
 
 app.listen(PORT, () => {
   console.log(`TaperKit running on http://localhost:${PORT}`)
-  // Auto-open browser in production mode
-  if (fs.existsSync(distPath)) {
+  // Auto-open browser in production mode (skip when running inside Electron)
+  const isElectron = !!process.env.ELECTRON_RUN_AS_NODE || !!process.versions?.electron
+  if (fs.existsSync(distPath) && !isElectron) {
     const url = `http://localhost:${PORT}`
     const cmd = process.platform === 'darwin' ? `open "${url}"` :
                 process.platform === 'win32' ? `start "${url}"` : `xdg-open "${url}"`

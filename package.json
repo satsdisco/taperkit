@@ -2,10 +2,14 @@
   "name": "taperkit",
   "version": "1.0.0",
   "type": "module",
+  "main": "electron/main.js",
   "scripts": {
     "dev": "concurrently \"npx tsx server/index.ts\" \"vite\"",
     "build": "vite build",
-    "start": "npm run build && npx tsx server/index.ts"
+    "start": "npm run build && npx tsx server/index.ts",
+    "electron:dev": "vite build && tsc -p tsconfig.electron.json && electron .",
+    "electron:build": "vite build && tsc -p tsconfig.server.json && printf '{\"type\":\"module\"}' > dist/server/package.json && tsc -p tsconfig.electron.json && electron-builder",
+    "package": "npm run electron:build"
   },
   "dependencies": {
     "@types/multer": "^2.1.0",
@@ -27,10 +31,30 @@
     "@vitejs/plugin-react": "^4.2.0",
     "autoprefixer": "^10.4.16",
     "concurrently": "^8.2.2",
+    "electron": "^34.0.0",
+    "electron-builder": "^25.0.0",
     "postcss": "^8.4.32",
     "tailwindcss": "^3.4.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.3.2",
-    "vite": "^5.0.6"
+    "vite": "^5.0.6",
+    "wait-on": "^8.0.0"
+  },
+  "build": {
+    "appId": "com.taperkit.app",
+    "productName": "TaperKit",
+    "asar": false,
+    "mac": {
+      "category": "public.app-category.music",
+      "target": [{"target": "dmg", "arch": ["arm64", "x64"]}],
+      "icon": "assets/icon.icns"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/main.js",
+      "electron/preload.js",
+      "package.json"
+    ],
+    "directories": {"output": "release"}
   }
 }
