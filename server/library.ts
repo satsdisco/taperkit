@@ -627,6 +627,12 @@ export function cleanTrackTitle(filename: string, ext: string): string {
     .replace(/\.(?:flac\d*|mp3|wav|aac|ogg|m4a|v\d+|\d{3})\s*$/i, '')
     // Strip catalog prefix: A071_, B002_, etc. (letter(s) + digits + underscore before track number)
     .replace(/^[A-Z]{1,4}\d{2,5}[_\s]+/i, '')
+    // Complex taper prefix: gdGMCCI_a1_d1_01_Title or phFTW_s1_d1_01_Title
+    // Pattern: letters_alphanum_d[disc]_[track]_
+    .replace(/^[a-zA-Z]{2,20}_[a-z]\d+_d\d+_\d+_/i, '')
+    // Simpler variant: tapercode_d1_01_ or tapercode_01_
+    .replace(/^[a-zA-Z]{2,20}_d\d+_\d+_/i, '')
+    .replace(/^[a-zA-Z]{2,20}_\d{2,3}_/i, '')
     // taper prefix + YYYY-MM-DD + disc + track: gd1977-05-08d1t01
     .replace(/^[a-z]{2,10}\d{4}-\d{2}-\d{2}d\d+t\d+[-_]?\s*/i, '')
     // taper prefix + date + disc + track: spacebacon240127d1_01_Title or sb2024-01-27d1t01Title

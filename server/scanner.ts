@@ -185,6 +185,9 @@ export function parseFolderName(folderName: string): Partial<ShowInfo> {
     .replace(/\s*\([^)]*\)/g, '')            // (anything)
     .replace(/\s*-?\s*FLAC\d*$/i, '')        // trailing -FLAC16
     .replace(/\s*-?\s*WEB\s*V\d.*$/i, '')    // trailing -WEB V0...
+    .replace(/\s*[-–]\s*V\d+$/i, '')         // trailing - V0, - V2 (quality tag)
+    .replace(/\s*[-–]\s*\d{3}$/i, '')        // trailing - 320 (bitrate)
+    .replace(/\s*[-–]\s*(?:16|24)[-\s]?(?:bit|48|96|192).*$/i, '') // trailing - 16Bit 48kHz etc.
     .replace(/\s*powered by.*$/i, '')         // powered by nugs.net
     .trim()
 
