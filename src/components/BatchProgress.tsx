@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useRef, useEffect, useState } from 'react'
 import { BatchApplyResult, LibraryShowSuggestion } from '../types'
 
 interface Props {
@@ -14,28 +14,59 @@ export default function BatchProgress({ approved, results, done }: Props) {
   const failed = results.filter(r => !r.success).length
   const pct = total > 0 ? Math.round((completed / total) * 100) : 0
 
-  // Build a map for quick lookup
+  const startTimeRef = useRef<number | null>(null)
+  const [, forceUpdate] = useState(0)
+
+  useEffect(() => {
+    if (results.length > 0 && startTimeRef.current === null) {
+      startTimeRef.current = Date.now()
+    }
+  }, [results.length])
+
+  // Tick for ETA display
+  useEffect(() => {
+    if (done || completed === 0) return
+    const interval = setInterval(() => forceUpdate(n => n + 1), 1000)
+    return () => clearInterval(interval)
+  }, [done, completed])
+
+  let etaLabel = ''
+  if (!done && completed > 0 && startTimeRef.current !== null) {
+    const elapsed = (Date.now() - startTimeRef.current) / 1000
+    const rate = completed / elapsed
+    const remaining = total - completed
+    const etaSecs = rate > 0 ? Math.round(remaining / rate) : 0
+    if (etaSecs > 60) {
+      etaLabel = `~${Math.ceil(etaSecs / 60)}m remaining`
+    } else if (etaSecs > 0) {
+      etaLabel = `~${etaSecs}s remaining`
+    }
+  }
+
   const resultMap = new Map(results.map(r => [r.showId, r]))
 
   return (
     <div style={{ padding: '24px', maxWidth: '700px', margin: '0 auto' }}>
       <div style={{ marginBottom: '20px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '8px' }}>
           <span style={{ fontWeight: 600 }}>
             {done ? 'Done' : 'Applying shows...'}
           </span>
-          <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>
-            {completed} / {total}
+          <span style={{ color: 'var(--text-muted)', fontSize: '13px', display: 'flex', gap: '12px', alignItems: 'baseline' }}>
+            {etaLabel && <span style={{ fontSize: '11px' }}>{etaLabel}</span>}
+            <span style={{ fontWeight: 600, color: 'var(--accent)', fontSize: '15px' }}>{pct}%</span>
+            <span>{completed} / {total}</span>
           </span>
         </div>
 
-        {/* Progress bar */}
+        {/* Progress bar with percentage overlay */}
         <div
           style={{
-            height: '8px',
+            height: '12px',
             background: 'var(--border)',
-            borderRadius: '4px',
+            borderRadius: '6px',
             overflow: 'hidden',
+            position: 'relative',
           }}
         >
           <div
@@ -43,10 +74,14 @@ export default function BatchProgress({ approved, results, done }: Props) {
               height: '100%',
               width: `${pct}%`,
               background: done && failed === 0 ? 'var(--success)' : 'var(--accent)',
-              borderRadius: '4px',
+              borderRadius: '6px',
               transition: 'width 0.3s ease',
             }}
           />
+        </div>
+
+        <div style={{ textAlign: 'center', marginTop: '4px', fontSize: '12px', color: 'var(--text-muted)' }}>
+          {completed} of {total} ({pct}%)
         </div>
       </div>
 
