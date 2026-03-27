@@ -176,13 +176,16 @@ function scoreHealth(
   date: string,
   venue: string,
   files: string[],
-  tagStatus: 'full' | 'partial' | 'none'
+  tagStatus: 'full' | 'partial' | 'none',
+  releaseType: 'live' | 'album' = 'live'
 ): { score: number; issues: string[] } {
   let score = 100
   const issues: string[] = []
 
   // Accept YYYY-MM-DD including day 00 (some shows only have month known)
-  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+  // For albums, a YYYY-01-01 placeholder date is valid (only year known)
+  const isPlaceholderAlbumDate = releaseType === 'album' && /^\d{4}-01-01$/.test(date)
+  if (!isPlaceholderAlbumDate && (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date))) {
     score -= 30
     issues.push('Missing or invalid date')
   }
@@ -190,7 +193,7 @@ function scoreHealth(
     score -= 20
     issues.push('Missing artist')
   }
-  if (!venue) {
+  if (releaseType === 'live' && !venue) {
     score -= 15
     issues.push('Missing venue')
   }
@@ -273,9 +276,15 @@ async function buildShow(
   const looksLikeAlbum = parsed.releaseType === 'album' || (!hasDate && !!albumYearMatch)
   const releaseType: 'live' | 'album' = looksLikeAlbum ? 'album' : 'live'
   const albumYear = parsed.year || (albumYearMatch ? albumYearMatch[1] : (parsed.date ? parsed.date.slice(0, 4) : ''))
+  const escapedArtistForAlbum = artist.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   const albumTitleParsed = parsed.albumTitle
     || (looksLikeAlbum
-      ? folderNameClean.replace(/\s*\{[^}]*\}/g, '').replace(/\s*\(.*?\)/g, '').replace(/\s*\[.*?\]/g, '').replace(new RegExp(`^${artist}\\s*-?\\s*`, 'i'), '').trim()
+      ? folderNameClean
+          .replace(/\s*\{[^}]*\}/g, '')
+          .replace(/\s*\(.*?\)/g, '')
+          .replace(/\s*\[.*?\]/g, '')
+          .replace(new RegExp(`^${escapedArtistForAlbum}\\s*-?\\s*`, 'i'), '')
+          .trim()
       : '')
 
   // Normalise date: accept YYYY-MM-DD, YYYY/MM/DD, YYYYMMDD, MM-DD-YYYY, MM/DD/YYYY
@@ -358,7 +367,7 @@ async function buildShow(
   const tagStatus: 'full' | 'partial' | 'none' =
     presentCount === 0 ? 'none' : presentCount === 4 ? 'full' : 'partial'
 
-  const { score, issues } = scoreHealth(artist, date, venue, files, tagStatus)
+  const { score, issues } = scoreHealth(artist, date, venue, files, tagStatus, releaseType)
 
   const libraryFiles: LibraryFile[] = files.map((f, i) => ({
     filePath: f,
@@ -553,9 +562,14 @@ export async function scanLibrary(
                       if (yearMatch) {
                         deepShow.releaseType = 'album'
                         deepShow.year = deepShow.year || yearMatch[1]
+                        const escapedDeepArtist = deepShow.artist.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
                         deepShow.albumTitle = deepShow.albumTitle ||
-                          showDir.name.replace(/\s*\[.*?\]/g, '').replace(/\s*\(.*?\)/g, '')
-                            .replace(new RegExp(`^${deepShow.artist}\\s*[-–]\\s*`, 'i'), '').trim()
+                          showDir.name
+                            .replace(/\s*\{[^}]*\}/g, '')
+                            .replace(/\s*\[.*?\]/g, '')
+                            .replace(/\s*\(.*?\)/g, '')
+                            .replace(new RegExp(`^${escapedDeepArtist}\\s*[-–]\\s*`, 'i'), '')
+                            .trim()
                       }
                     }
                   }

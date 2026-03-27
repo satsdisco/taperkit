@@ -172,12 +172,23 @@ export default function SuggestionPanel({ show, onClose, onApprove, onSkip, dest
         artworkUrl = `https://coverartarchive.org/release/${best.id}/front-500`
       }
 
+      // Guard: only accept MB title if it reasonably matches the existing albumTitle.
+      // If existing albumTitle is set and MB returns something completely different, keep ours.
+      const existingAlbumTitle = suggestion.albumTitle || ''
+      const mbTitleLower = best.title.toLowerCase()
+      const existingWords = existingAlbumTitle.toLowerCase().split(/\s+/).filter(w => w.length > 2)
+      const mbTitleMatchesExisting =
+        !existingAlbumTitle ||
+        existingWords.some(w => mbTitleLower.includes(w))
+      const acceptedAlbumTitle = mbTitleMatchesExisting ? best.title : existingAlbumTitle
+      const acceptedFolderName = [acceptedAlbumTitle, mbYear ? `(${mbYear})` : ''].filter(Boolean).join(' ')
+
       setSuggestion(prev => prev ? {
         ...prev,
         artist: mbArtist,
-        albumTitle: best.title,
+        albumTitle: acceptedAlbumTitle,
         year: mbYear,
-        proposedFolderName: [best.title, mbYear ? `(${mbYear})` : ''].filter(Boolean).join(' '),
+        proposedFolderName: acceptedFolderName,
         ...(artworkUrl ? { mbArtworkUrl: artworkUrl } : {}),
       } : prev)
       if (!artworkUrl) setMbError('Found release but no cover art available')
