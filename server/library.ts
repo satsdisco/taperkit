@@ -435,7 +435,7 @@ export async function scanLibrary(
 
     let rootDirs: fs.Dirent[]
     try {
-      rootDirs = fs.readdirSync(sourceRoot, { withFileTypes: true }).filter(e => e.isDirectory())
+      rootDirs = fs.readdirSync(sourceRoot, { withFileTypes: true }).filter(e => e.isDirectory() && !e.name.startsWith('.'))
     } catch {
       continue
     }
@@ -490,12 +490,16 @@ export async function scanLibrary(
           showDirs = fs.readdirSync(artistPath, { withFileTypes: true }).filter(e => e.isDirectory())
         } catch { continue }
 
-        // Also handle: artist folder has audio files directly (Bisco Mixes etc.)
-        const artistAudioFiles = collectAudioFiles(artistPath)
-        if (artistAudioFiles.length > 0 && showDirs.length === 0) {
-          onEvent({ type: 'progress', msg: `Scanning: ${artistDir.name} (loose files)`, current })
+        // Check if this "artist dir" actually IS a show/album folder:
+        // Has audio files directly inside (e.g. "Curtis Mayfield - Curtis-Live! [2000] [CD V0]/01. ...")
+        // Subdirs may exist (Artwork, sleeves) but are non-audio — treat the whole thing as one album
+        const artistRootAudio = fs.readdirSync(artistPath, { withFileTypes: true })
+          .filter(e => e.isFile() && AUDIO_EXTENSIONS.includes(path.extname(e.name).toLowerCase()))
+        if (artistRootAudio.length > 0) {
+          onEvent({ type: 'progress', msg: `Scanning: ${artistDir.name}`, current })
           const show = await buildShow(artistPath, sourceRoot, null)
           if (show) { allShows.push(markDone(show)); current++ }
+          continue
         }
 
         // Check if ALL show subdirs are disc folders (CD 01, CD 02, Disc 1, etc.)
