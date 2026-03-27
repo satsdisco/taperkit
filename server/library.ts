@@ -612,15 +612,21 @@ export function cleanTrackTitle(filename: string, ext: string): string {
     .replace(/^d\d{3,4}\s*[-_]?\s*/i, '')      // d201
     // N-NN Title (disc-track without d prefix: "1-01 Carini" → "Carini")
     .replace(/^\d-\d{2}\s+/, '')
-    // 01 - Title or 01_Title
-    .replace(/^\d{1,3}\s*[-_.]\s*/, '')
+    // 01 - Title or 01 – Title or 01_Title
+    .replace(/^\d{1,3}\s*[-–—_.]\s*/, '')
     // double track prefix: "01 01 – Title" or "01 01 - Title" → "Title"
-    .replace(/^\d{1,3}\s+\d{1,3}\s*[–—-]\s*/, '')
+    .replace(/^\d{1,3}\s+\d{1,3}\s*[-–—]\s*/, '')
     // bare leading number leftover: "01 Carini" → "Carini"
     .replace(/^\d{1,2}\s+(?=[A-Z])/i, '')
-    // "Drive-By Truckers - 01 - Title" or "Drive-By Truckers - Title" — strip leading artist+sep
-    // Match: anything up to " - " followed by optional "NN - "
-    .replace(/^.+?\s+-\s+(?:\d{1,3}\s+-\s+)?(?=\S)/, '')
+    // "Drive-By Truckers - 01 - Title" — strip "Artist - " or "Artist - 01 - " prefix
+    // Split on first " - " outside parens; only strip if prefix looks like an artist (has letters, not a date)
+    .replace(/^([^(–—]*?)\s+[-–—]\s+(?:\d{1,3}\s+[-–—]\s+)?(?=\S)/, (match, prefix) => {
+      // Don't strip if prefix is just a date like "10-31-78" or numbers
+      if (/^\d[\d\-_\/\.]+$/.test(prefix.trim())) return match
+      // Don't strip if prefix doesn't contain at least 2 consecutive letters (not an artist name)
+      if (!/[a-zA-Z]{2}/.test(prefix)) return match
+      return ''
+    })
 
   // After stripping disc/track prefix, YYYY-prefixed remainder may be exposed:
   // "2002 - 10-05d1t01 Hot Air Balloon" or "2007 - 11-01d1t01-Astronaut"
