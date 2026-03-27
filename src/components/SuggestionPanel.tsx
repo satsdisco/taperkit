@@ -12,20 +12,21 @@ interface Props {
 
 const fieldStyle: React.CSSProperties = {
   width: '100%',
-  background: 'var(--surface)',
+  background: 'var(--bg)',
   border: '1px solid var(--border)',
-  borderRadius: '4px',
-  padding: '6px 8px',
+  borderRadius: '6px',
+  padding: '7px 10px',
   color: 'var(--text)',
   fontSize: '13px',
 }
 
 const labelStyle: React.CSSProperties = {
   fontSize: '11px',
+  fontWeight: 600,
   color: 'var(--text-muted)',
   textTransform: 'uppercase',
-  letterSpacing: '0.5px',
-  marginBottom: '4px',
+  letterSpacing: '0.06em',
+  marginBottom: '5px',
 }
 
 type SuggestionWithMb = LibraryShowSuggestion & { mbArtworkUrl?: string }
@@ -211,17 +212,26 @@ export default function SuggestionPanel({ show, onClose, onApprove, onSkip, dest
 
   const firstFile = show.files[0]
 
+  // Jellyfin output path preview
+  const jellyfinPath = suggestion
+    ? [
+        destinationRoot,
+        suggestion.artist,
+        suggestion.proposedFolderName,
+      ].filter(Boolean).join('/')
+    : null
+
   return (
     <>
       {/* Side panel */}
       <div
         style={{
           position: 'fixed',
-          top: '52px',
+          top: '56px',
           right: 0,
-          width: '50%',
-          height: 'calc(100vh - 52px)',
-          background: 'var(--bg)',
+          width: '420px',
+          height: 'calc(100vh - 56px)',
+          background: 'var(--surface)',
           borderLeft: '1px solid var(--border)',
           display: 'flex',
           flexDirection: 'column',
@@ -231,8 +241,28 @@ export default function SuggestionPanel({ show, onClose, onApprove, onSkip, dest
         }}
       >
         {loading ? (
-          <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
-            Loading suggestion...
+          <div
+            style={{
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '12px',
+              color: 'var(--text-muted)',
+            }}
+          >
+            <div
+              style={{
+                width: '28px',
+                height: '28px',
+                border: '2px solid var(--border)',
+                borderTopColor: 'var(--accent)',
+                borderRadius: '50%',
+                animation: 'spin 0.8s linear infinite',
+              }}
+            />
+            <span style={{ fontSize: '13px' }}>Loading suggestion...</span>
           </div>
         ) : error || !suggestion ? (
           <div style={{ padding: '40px', textAlign: 'center', color: 'var(--error)' }}>
@@ -243,34 +273,40 @@ export default function SuggestionPanel({ show, onClose, onApprove, onSkip, dest
             {/* Header */}
             <div
               style={{
-                padding: '12px 20px',
+                padding: '16px 20px',
                 borderBottom: '1px solid var(--border)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
                 flexShrink: 0,
               }}
             >
-              <div>
-                <div style={{ fontWeight: 600, fontSize: '14px' }}>Review Show</div>
-                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px', fontFamily: 'monospace' }}>
-                  {show.folderPath.split('/').pop()}
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px' }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontWeight: 700, fontSize: '16px', color: 'var(--text)', marginBottom: '2px' }}>
+                    {suggestion.artist || 'Unknown Artist'}
+                  </div>
+                  <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+                    {suggestion.date}
+                    {suggestion.venue ? ` · ${suggestion.venue}` : ''}
+                    {suggestion.city ? `, ${suggestion.city}` : ''}
+                    {suggestion.state ? `, ${suggestion.state}` : ''}
+                  </div>
                 </div>
+                <button
+                  onClick={onClose}
+                  style={{
+                    background: 'var(--surface-2)',
+                    border: '1px solid var(--border)',
+                    color: 'var(--text-muted)',
+                    fontSize: '16px',
+                    cursor: 'pointer',
+                    lineHeight: 1,
+                    padding: '4px 9px',
+                    borderRadius: '6px',
+                    flexShrink: 0,
+                  }}
+                >
+                  ×
+                </button>
               </div>
-              <button
-                onClick={onClose}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: 'var(--text-muted)',
-                  fontSize: '20px',
-                  cursor: 'pointer',
-                  lineHeight: 1,
-                  padding: '4px 8px',
-                }}
-              >
-                ×
-              </button>
             </div>
 
             {/* Body: two columns */}
@@ -278,25 +314,23 @@ export default function SuggestionPanel({ show, onClose, onApprove, onSkip, dest
               {/* Left: Current state */}
               <div
                 style={{
-                  padding: '16px 20px',
+                  padding: '16px 16px',
                   borderRight: '1px solid var(--border)',
-                  background: 'var(--surface)',
+                  background: 'var(--bg)',
                   overflowY: 'auto',
                 }}
               >
-                <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                  Current
-                </div>
+                <div style={{ ...labelStyle, marginBottom: '12px' }}>Current</div>
 
                 {(existingArtworkUrl || suggestion.releaseType === 'album') && (
                   <div style={{ marginBottom: '14px' }}>
                     <div style={labelStyle}>Album Art</div>
                     <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-end' }}>
                       <div style={{
-                        width: 72, height: 72, borderRadius: 5,
-                        background: 'var(--border)', overflow: 'hidden', flexShrink: 0,
+                        width: 64, height: 64, borderRadius: 8,
+                        background: 'var(--surface)', overflow: 'hidden', flexShrink: 0,
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: 24, border: '1px solid var(--border)',
+                        fontSize: 20, border: '1px solid var(--border)',
                       }}>
                         {existingArtworkUrl
                           ? <img src={existingArtworkUrl} alt="artwork" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -307,7 +341,7 @@ export default function SuggestionPanel({ show, onClose, onApprove, onSkip, dest
                         <div style={{ fontSize: 12, fontWeight: 600 }}>{show.albumTitle || show.artist}</div>
                         <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{show.artist}</div>
                         <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{show.year || show.date?.slice(0, 4)}</div>
-                        <div style={{ fontSize: 10, color: existingArtworkUrl ? 'var(--accent)' : 'var(--text-muted)', marginTop: 3 }}>
+                        <div style={{ fontSize: 10, color: existingArtworkUrl ? 'var(--success)' : 'var(--text-muted)', marginTop: 3 }}>
                           {existingArtworkUrl ? '✓ Artwork embedded' : '⚠ No artwork'}
                         </div>
                       </div>
@@ -367,10 +401,8 @@ export default function SuggestionPanel({ show, onClose, onApprove, onSkip, dest
               </div>
 
               {/* Right: Proposed state (editable) */}
-              <div style={{ padding: '16px 20px', overflowY: 'auto' }}>
-                <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--accent)', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                  Proposed
-                </div>
+              <div style={{ padding: '16px', overflowY: 'auto', background: 'var(--surface)' }}>
+                <div style={{ ...labelStyle, color: 'var(--accent)', marginBottom: '12px' }}>Proposed</div>
 
                 <div style={{ marginBottom: '10px' }}>
                   <div style={labelStyle}>Folder Name</div>
@@ -382,7 +414,7 @@ export default function SuggestionPanel({ show, onClose, onApprove, onSkip, dest
                 </div>
 
                 {/* Release type toggle */}
-                <div style={{ display: 'flex', gap: '6px', marginBottom: '10px' }}>
+                <div style={{ display: 'flex', gap: '6px', marginBottom: '12px' }}>
                   {(['live', 'album'] as const).map(t => (
                     <button
                       key={t}
@@ -408,15 +440,15 @@ export default function SuggestionPanel({ show, onClose, onApprove, onSkip, dest
                         return { ...prev, releaseType: t, proposedFiles: rebuiltFiles, proposedFolderName }
                       })}
                       style={{
-                        padding: '4px 12px',
-                        background: suggestion.releaseType === t ? 'var(--accent)' : 'var(--surface)',
-                        color: suggestion.releaseType === t ? '#1a1a1a' : 'var(--text-muted)',
-                        border: '1px solid var(--border)',
-                        borderRadius: '4px',
+                        padding: '5px 14px',
+                        background: suggestion.releaseType === t ? 'var(--accent)' : 'var(--surface-2)',
+                        color: suggestion.releaseType === t ? '#fff' : 'var(--text-muted)',
+                        border: suggestion.releaseType === t ? '1px solid var(--accent)' : '1px solid var(--border)',
+                        borderRadius: '20px',
                         fontWeight: suggestion.releaseType === t ? 600 : 400,
                         fontSize: '11px',
-                        textTransform: 'uppercase',
                         cursor: 'pointer',
+                        transition: 'all 0.15s',
                       }}
                     >
                       {t === 'live' ? '🎤 Live' : '💿 Album'}
@@ -454,7 +486,7 @@ export default function SuggestionPanel({ show, onClose, onApprove, onSkip, dest
                       <button
                         onClick={searchMusicBrainz}
                         disabled={mbSearching || !suggestion.artist}
-                        style={{ padding: '5px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '4px', color: 'var(--text)', fontSize: '11px', cursor: 'pointer', opacity: mbSearching ? 0.6 : 1, whiteSpace: 'nowrap' }}
+                        style={{ padding: '5px 12px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)', fontSize: '11px', cursor: 'pointer', opacity: mbSearching ? 0.6 : 1, whiteSpace: 'nowrap' }}
                       >
                         {mbSearching ? '🔍 Searching…' : '🎵 Lookup MusicBrainz'}
                       </button>
@@ -462,7 +494,7 @@ export default function SuggestionPanel({ show, onClose, onApprove, onSkip, dest
                         <img
                           src={suggestion.mbArtworkUrl}
                           alt="Album art"
-                          style={{ width: 40, height: 40, borderRadius: 4, objectFit: 'cover', border: '1px solid var(--border)' }}
+                          style={{ width: 36, height: 36, borderRadius: 6, objectFit: 'cover', border: '1px solid var(--border)' }}
                         />
                       )}
                       {mbError && <span style={{ fontSize: '11px', color: 'var(--error)' }}>{mbError}</span>}
@@ -471,12 +503,11 @@ export default function SuggestionPanel({ show, onClose, onApprove, onSkip, dest
                 )}
 
                 {/* File renames with diff highlighting */}
-                <div>
+                <div style={{ marginBottom: '14px' }}>
                   <div style={labelStyle}>File Renames</div>
-                  <div style={{ overflowY: 'auto', maxHeight: '240px' }}>
+                  <div style={{ overflowY: 'auto', maxHeight: '220px' }}>
                     {suggestion.proposedFiles.map((f, i) => (
                       <div key={i} style={{ marginBottom: '6px' }}>
-                        {/* Original filename (muted) */}
                         <div style={{ fontSize: '10px', color: 'var(--text-muted)', fontFamily: 'monospace', marginBottom: '2px', opacity: 0.7 }}>
                           <FileDiff original={f.originalFilename} proposed={f.proposedFilename} />
                         </div>
@@ -491,7 +522,7 @@ export default function SuggestionPanel({ show, onClose, onApprove, onSkip, dest
                 </div>
 
                 {/* Artwork */}
-                <div style={{ marginTop: '14px', paddingTop: '14px', borderTop: '1px solid var(--border)' }}>
+                <div style={{ paddingTop: '12px', borderTop: '1px solid var(--border)' }}>
                   <ArtworkPicker
                     artist={suggestion.artist}
                     date={suggestion.date}
@@ -513,30 +544,65 @@ export default function SuggestionPanel({ show, onClose, onApprove, onSkip, dest
               </div>
             </div>
 
-            {/* Footer actions */}
+            {/* Footer */}
             <div
               style={{
-                padding: '12px 20px',
-                borderTop: '1px solid var(--border)',
-                display: 'flex',
-                gap: '10px',
-                justifyContent: 'space-between',
-                alignItems: 'center',
                 flexShrink: 0,
-                background: 'var(--surface)',
+                background: 'var(--bg)',
+                borderTop: '1px solid var(--border)',
               }}
             >
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'flex', gap: '12px' }}>
-                <span style={{ opacity: 0.7 }}><kbd style={kbdStyle}>A</kbd> approve</span>
-                <span style={{ opacity: 0.7 }}><kbd style={kbdStyle}>S</kbd> skip</span>
-                <span style={{ opacity: 0.7 }}><kbd style={kbdStyle}>← →</kbd> navigate</span>
-                <span style={{ opacity: 0.7 }}><kbd style={kbdStyle}>Esc</kbd> close</span>
-              </div>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button className="btn-secondary" style={{ padding: '6px 16px', fontSize: '13px' }} onClick={onSkip}>Skip</button>
-                <button className="btn-primary" style={{ padding: '6px 16px', fontSize: '13px' }} onClick={() => onApprove(suggestion)}>
-                  Approve
-                </button>
+              {/* Jellyfin path preview */}
+              {jellyfinPath && (
+                <div
+                  style={{
+                    padding: '8px 16px',
+                    borderBottom: '1px solid var(--border)',
+                    fontSize: '11px',
+                    color: 'var(--text-muted)',
+                    fontFamily: 'monospace',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  <span style={{ color: 'var(--accent)', marginRight: '4px' }}>📁</span>
+                  {jellyfinPath}/
+                </div>
+              )}
+
+              {/* Actions */}
+              <div
+                style={{
+                  padding: '10px 16px',
+                  display: 'flex',
+                  gap: '8px',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                }}
+              >
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'flex', gap: '10px' }}>
+                  <span><kbd style={kbdStyle}>A</kbd> approve</span>
+                  <span><kbd style={kbdStyle}>S</kbd> skip</span>
+                  <span><kbd style={kbdStyle}>← →</kbd> nav</span>
+                  <span><kbd style={kbdStyle}>Esc</kbd> close</span>
+                </div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    className="btn-secondary"
+                    style={{ padding: '6px 16px', fontSize: '13px', borderRadius: '6px' }}
+                    onClick={onSkip}
+                  >
+                    Skip
+                  </button>
+                  <button
+                    className="btn-primary"
+                    style={{ padding: '6px 20px', fontSize: '13px', borderRadius: '6px' }}
+                    onClick={() => onApprove(suggestion)}
+                  >
+                    Approve ✓
+                  </button>
+                </div>
               </div>
             </div>
           </>
@@ -548,11 +614,8 @@ export default function SuggestionPanel({ show, onClose, onApprove, onSkip, dest
           from { transform: translateX(100%); opacity: 0; }
           to { transform: translateX(0); opacity: 1; }
         }
-        @media (max-width: 1024px) {
-          .suggestion-panel-override {
-            width: 100% !important;
-            left: 0 !important;
-          }
+        @keyframes spin {
+          to { transform: rotate(360deg); }
         }
       `}</style>
     </>
@@ -561,12 +624,13 @@ export default function SuggestionPanel({ show, onClose, onApprove, onSkip, dest
 
 const kbdStyle: React.CSSProperties = {
   display: 'inline-block',
-  background: 'var(--border)',
+  background: 'var(--surface-2)',
+  border: '1px solid var(--border)',
   borderRadius: '3px',
   padding: '1px 5px',
   fontSize: '10px',
   fontFamily: 'monospace',
-  color: 'var(--text)',
+  color: 'var(--text-muted)',
 }
 
 // Simple diff: show unchanged prefix/suffix in muted, changed middle highlighted

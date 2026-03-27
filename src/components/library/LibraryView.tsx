@@ -434,31 +434,28 @@ export default function LibraryView() {
           alignItems: 'center',
           justifyContent: 'center',
           minHeight: '60vh',
-          gap: '16px',
+          gap: '20px',
           color: 'var(--text-muted)',
         }}
       >
-        <div
-          style={{
-            width: '36px',
-            height: '36px',
-            border: '3px solid var(--border)',
-            borderTopColor: 'var(--accent)',
-            borderRadius: '50%',
-            animation: 'spin 0.8s linear infinite',
-          }}
-        />
+        <div style={{ fontSize: '40px', animation: 'pulse 2s ease-in-out infinite' }}>📼</div>
         <div style={{ textAlign: 'center' }}>
-          <div style={{ color: 'var(--text)', fontWeight: 600, marginBottom: '4px' }}>
+          <div style={{ color: 'var(--text)', fontWeight: 700, fontSize: '18px', marginBottom: '6px' }}>
             Scanning library...
           </div>
-          <div style={{ fontSize: '13px' }}>{scanMsg}</div>
+          <div style={{ fontSize: '13px', maxWidth: '280px' }}>{scanMsg}</div>
           {scanCount > 0 && (
-            <div style={{ fontSize: '12px', marginTop: '4px', color: 'var(--accent)' }}>
-              {scanCount} shows found so far
+            <div style={{ fontSize: '13px', marginTop: '8px', color: 'var(--accent)', fontWeight: 600 }}>
+              {scanCount} shows found
             </div>
           )}
         </div>
+        <style>{`
+          @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 0.8; }
+            50% { transform: scale(1.08); opacity: 1; }
+          }
+        `}</style>
       </div>
     )
   }
@@ -468,20 +465,23 @@ export default function LibraryView() {
       <div>
         <div
           style={{
-            padding: '16px 24px',
+            padding: '14px 24px',
             borderBottom: '1px solid var(--border)',
             display: 'flex',
             alignItems: 'center',
             gap: '12px',
+            background: 'var(--surface)',
           }}
         >
           {applyDone && (
-            <button className="btn-secondary" onClick={() => setStep('results')}>
+            <button className="btn-secondary" style={{ borderRadius: '6px' }} onClick={() => setStep('results')}>
               ← Back to results
             </button>
           )}
-          <span style={{ fontWeight: 600 }}>
-            Applying {approvedSuggestions.length} shows to {sources.destination}
+          <span style={{ fontWeight: 600, fontSize: '14px' }}>
+            {applyDone
+              ? 'Apply complete'
+              : `Copying ${approvedSuggestions.length} shows → ${sources.destination.split('/').pop()}`}
           </span>
         </div>
         <BatchProgress
@@ -498,7 +498,7 @@ export default function LibraryView() {
     <div
       style={{
         padding: '24px',
-        paddingRight: reviewShow ? 'calc(50vw + 24px)' : '24px',
+        paddingRight: reviewShow ? 'calc(420px + 24px)' : '24px',
         maxWidth: reviewShow ? 'none' : '1100px',
         margin: reviewShow ? '0' : '0 auto',
         transition: 'padding-right 0.3s ease, max-width 0.3s ease, margin 0.3s ease',
@@ -520,39 +520,43 @@ export default function LibraryView() {
 
       {step === 'results' && shows.length > 0 && (
         <>
-          {/* Summary cards */}
+          {/* Summary bar */}
           <div
             style={{
               display: 'flex',
               flexWrap: 'wrap',
-              gap: '12px',
+              gap: '10px',
               marginBottom: '20px',
             }}
           >
             {[
-              { label: 'Total Shows', value: shows.length, color: 'var(--accent)' },
-              { label: 'Duplicates Detected', value: duplicateGroups.length, color: 'var(--warning)' },
-              { label: 'Needs Attention', value: shows.filter(s => !s.alreadyDone && s.healthScore < 70).length, color: 'var(--error)' },
-              { label: 'Ready to Copy', value: shows.filter(s => !s.alreadyDone && s.healthScore >= 70).length, color: 'var(--success)' },
-              { label: 'Already Done', value: shows.filter(s => s.alreadyDone).length, color: 'var(--text-muted)' },
+              { label: 'Total', value: shows.length, color: 'var(--text)', icon: '🎵' },
+              { label: 'Need Review', value: shows.filter(s => !s.alreadyDone && s.healthScore < 70).length, color: 'var(--warning)', icon: '⚠' },
+              { label: 'Duplicates', value: duplicateGroups.length, color: 'var(--warning)', icon: '⊕' },
+              { label: 'Ready', value: shows.filter(s => !s.alreadyDone && s.healthScore >= 70).length, color: 'var(--success)', icon: '✓' },
+              { label: 'In Library', value: shows.filter(s => s.alreadyDone).length, color: 'var(--text-muted)', icon: '📁' },
             ].map(card => (
               <div
                 key={card.label}
                 style={{
                   background: 'var(--surface)',
                   border: '1px solid var(--border)',
-                  borderRadius: '8px',
-                  padding: '16px',
-                  textAlign: 'center',
-                  flex: '1 1 160px',
-                  minWidth: '120px',
+                  borderRadius: '10px',
+                  padding: '14px 20px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  flex: '1 1 130px',
+                  minWidth: '110px',
                 }}
               >
-                <div style={{ fontSize: '28px', fontWeight: 700, color: card.color }}>
+                <div style={{ fontSize: '26px', fontWeight: 800, color: card.color, lineHeight: 1 }}>
                   {card.value}
                 </div>
-                <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                  {card.label}
+                <div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>
+                    {card.label}
+                  </div>
                 </div>
               </div>
             ))}

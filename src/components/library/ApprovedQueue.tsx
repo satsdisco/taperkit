@@ -14,10 +14,10 @@ export default function ApprovedQueue({ approvedSuggestions, onRemove, onApply, 
   return (
     <div
       style={{
-        background: 'rgba(76,175,80,0.08)',
-        border: '1px solid var(--success)',
-        borderRadius: '8px',
-        padding: '12px 16px',
+        background: 'rgba(72, 187, 120, 0.07)',
+        border: '1px solid rgba(72, 187, 120, 0.3)',
+        borderRadius: '10px',
+        padding: '14px 16px',
         marginBottom: '16px',
         display: 'flex',
         alignItems: 'center',
@@ -25,9 +25,12 @@ export default function ApprovedQueue({ approvedSuggestions, onRemove, onApply, 
         flexWrap: 'wrap',
       }}
     >
-      <span style={{ fontWeight: 600, color: 'var(--success)', flexShrink: 0 }}>
-        {approvedSuggestions.length} approved
-      </span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+        <span style={{ fontSize: '16px' }}>✓</span>
+        <span style={{ fontWeight: 700, color: 'var(--success)', fontSize: '14px' }}>
+          {approvedSuggestions.length} approved
+        </span>
+      </div>
 
       <div style={{ flex: 1, display: 'flex', gap: '6px', flexWrap: 'wrap', minWidth: 0 }}>
         {approvedSuggestions.slice(0, 8).map(s => (
@@ -37,12 +40,13 @@ export default function ApprovedQueue({ approvedSuggestions, onRemove, onApply, 
               fontSize: '11px',
               background: 'var(--surface)',
               border: '1px solid var(--border)',
-              borderRadius: '4px',
-              padding: '2px 6px',
+              borderRadius: '20px',
+              padding: '3px 10px',
               display: 'flex',
               alignItems: 'center',
               gap: '4px',
               whiteSpace: 'nowrap',
+              color: 'var(--text)',
             }}
           >
             {s.artist} {s.date}
@@ -54,7 +58,7 @@ export default function ApprovedQueue({ approvedSuggestions, onRemove, onApply, 
                 color: 'var(--text-muted)',
                 cursor: 'pointer',
                 padding: '0 0 0 2px',
-                fontSize: '12px',
+                fontSize: '13px',
                 lineHeight: 1,
               }}
             >
@@ -70,14 +74,14 @@ export default function ApprovedQueue({ approvedSuggestions, onRemove, onApply, 
       </div>
 
       <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
-        <button className="btn-primary" onClick={onApply}>
+        <button className="btn-primary" style={{ borderRadius: '6px' }} onClick={onApply}>
           Apply {approvedSuggestions.length} shows →
         </button>
         <button
           className="btn-secondary"
           onClick={onApplyAndClean}
           title="Apply then automatically trash source folders"
-          style={{ fontSize: '13px' }}
+          style={{ fontSize: '13px', borderRadius: '6px' }}
         >
           Apply & Clean
         </button>

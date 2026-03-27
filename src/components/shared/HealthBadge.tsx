@@ -1,26 +1,32 @@
 import React from 'react'
 
 export default function HealthBadge({ score }: { score: number }) {
-  const [emoji, color] =
-    score >= 70 ? ['✅', 'var(--success)'] : score >= 40 ? ['⚠️', 'var(--warning)'] : ['❌', 'var(--error)']
+  const [label, color] =
+    score >= 70
+      ? ['✓', 'var(--success)']
+      : score >= 40
+        ? ['!', 'var(--warning)']
+        : ['✗', 'var(--error)']
+
   return (
     <span
-      title={`Health: ${score}`}
+      title={`Health score: ${score}`}
       style={{
         display: 'inline-flex',
         alignItems: 'center',
-        gap: '4px',
-        fontSize: '12px',
-        padding: '2px 8px',
-        borderRadius: '12px',
-        background: `${color}22`,
-        border: `1px solid ${color}44`,
+        justifyContent: 'center',
+        width: '28px',
+        height: '28px',
+        borderRadius: '50%',
+        background: `${color}18`,
+        border: `1px solid ${color}40`,
         color,
-        whiteSpace: 'nowrap',
+        fontSize: '12px',
+        fontWeight: 700,
         flexShrink: 0,
       }}
     >
-      {emoji} {score}
+      {label}
     </span>
   )
 }

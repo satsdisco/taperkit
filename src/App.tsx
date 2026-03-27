@@ -38,6 +38,9 @@ export default function App() {
     setError(null)
   }
 
+  const isLibraryActive = view === 'library'
+  const isSingleActive = view === 'single-folder' || view === 'editor'
+
   return (
     <ToastProvider>
       <div className="min-h-screen" style={{ backgroundColor: 'var(--bg)' }}>
@@ -47,12 +50,13 @@ export default function App() {
             backgroundColor: 'var(--surface)',
             borderBottom: '1px solid var(--border)',
             padding: '0 24px',
-            height: '52px',
+            height: '56px',
             display: 'flex',
             alignItems: 'center',
-            gap: '16px',
+            gap: '20px',
           }}
         >
+          {/* Back button (editor mode only) */}
           {view === 'editor' && (
             <button
               onClick={handleBackToLibrary}
@@ -61,7 +65,7 @@ export default function App() {
                 border: 'none',
                 color: 'var(--text-muted)',
                 padding: '4px 8px',
-                fontSize: '20px',
+                fontSize: '18px',
                 lineHeight: 1,
               }}
               title="Back to library"
@@ -69,6 +73,8 @@ export default function App() {
               ←
             </button>
           )}
+
+          {/* Logo */}
           <button
             onClick={handleBackToLibrary}
             style={{
@@ -79,37 +85,45 @@ export default function App() {
               display: 'flex',
               alignItems: 'center',
               gap: '10px',
+              flexShrink: 0,
             }}
           >
-            <span
-              style={{
-                fontSize: '18px',
-                fontWeight: 700,
-                color: 'var(--accent)',
-                letterSpacing: '-0.5px',
-              }}
-            >
-              TaperKit
-            </span>
-            <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>
-              Live music library manager
-            </span>
+            <span style={{ fontSize: '20px', lineHeight: 1 }}>📼</span>
+            <div style={{ textAlign: 'left' }}>
+              <div
+                style={{
+                  fontSize: '15px',
+                  fontWeight: 700,
+                  color: 'var(--text)',
+                  letterSpacing: '-0.3px',
+                  lineHeight: 1.2,
+                }}
+              >
+                TaperKit
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', lineHeight: 1.2 }}>
+                Live music → Jellyfin ready
+              </div>
+            </div>
           </button>
 
-          {/* Nav links */}
-          <nav style={{ display: 'flex', gap: '4px', marginLeft: '8px' }}>
+          {/* Separator */}
+          <div style={{ width: '1px', height: '24px', background: 'var(--border)', flexShrink: 0 }} />
+
+          {/* Nav tabs — pill style */}
+          <nav style={{ display: 'flex', gap: '4px' }}>
             <button
               onClick={handleBackToLibrary}
               style={{
-                background: 'none',
-                border: 'none',
-                padding: '4px 12px',
-                borderRadius: '4px',
+                background: isLibraryActive ? 'rgba(108, 99, 255, 0.15)' : 'none',
+                border: isLibraryActive ? '1px solid rgba(108, 99, 255, 0.35)' : '1px solid transparent',
+                borderRadius: '20px',
+                padding: '5px 14px',
                 fontSize: '13px',
                 cursor: 'pointer',
-                color: view === 'library' ? 'var(--accent)' : 'var(--text-muted)',
-                fontWeight: view === 'library' ? 600 : 400,
-                borderBottom: view === 'library' ? '2px solid var(--accent)' : '2px solid transparent',
+                color: isLibraryActive ? 'var(--accent)' : 'var(--text-muted)',
+                fontWeight: isLibraryActive ? 600 : 400,
+                transition: 'all 0.15s',
               }}
             >
               Library
@@ -117,18 +131,18 @@ export default function App() {
             <button
               onClick={() => { setView('single-folder'); setShow(null); setError(null) }}
               style={{
-                background: 'none',
-                border: 'none',
-                padding: '4px 12px',
-                borderRadius: '4px',
+                background: isSingleActive ? 'rgba(108, 99, 255, 0.15)' : 'none',
+                border: isSingleActive ? '1px solid rgba(108, 99, 255, 0.35)' : '1px solid transparent',
+                borderRadius: '20px',
+                padding: '5px 14px',
                 fontSize: '13px',
                 cursor: 'pointer',
-                color: view === 'single-folder' || view === 'editor' ? 'var(--accent)' : 'var(--text-muted)',
-                fontWeight: view === 'single-folder' || view === 'editor' ? 600 : 400,
-                borderBottom: view === 'single-folder' || view === 'editor' ? '2px solid var(--accent)' : '2px solid transparent',
+                color: isSingleActive ? 'var(--accent)' : 'var(--text-muted)',
+                fontWeight: isSingleActive ? 600 : 400,
+                transition: 'all 0.15s',
               }}
             >
-              Open Single Folder
+              Single Folder
             </button>
           </nav>
         </header>

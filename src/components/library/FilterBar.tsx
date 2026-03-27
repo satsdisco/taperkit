@@ -41,113 +41,142 @@ export default function FilterBar({
   const readyCount = shows.filter(s => !s.alreadyDone && s.healthScore >= 70).length
   const dupeShowCount = shows.filter(s => !s.alreadyDone && dupShowIdSet.has(s.id)).length
 
-  const tabs: { id: FilterTab; label: string }[] = [
-    { id: 'all', label: `Pending (${shows.filter(s => !s.alreadyDone).length})` },
-    { id: 'attention', label: `Needs Attention (${needsAttentionCount})` },
-    { id: 'duplicates', label: `Duplicates (${dupeShowCount})` },
-    { id: 'ready', label: `Ready (${readyCount})` },
-    { id: 'in-library', label: `📁 In Library (${inLibraryCount})` },
-    { id: 'done', label: `✅ Done (${doneCount})` },
+  const tabs: { id: FilterTab; label: string; count: number; color?: string }[] = [
+    { id: 'all', label: 'Pending', count: shows.filter(s => !s.alreadyDone).length },
+    { id: 'attention', label: 'Needs Attention', count: needsAttentionCount, color: 'var(--warning)' },
+    { id: 'duplicates', label: 'Duplicates', count: dupeShowCount, color: 'var(--warning)' },
+    { id: 'ready', label: 'Ready', count: readyCount, color: 'var(--success)' },
+    { id: 'in-library', label: 'In Library', count: inLibraryCount },
+    { id: 'done', label: 'Done', count: doneCount, color: 'var(--success)' },
   ]
 
   return (
-    <div>
-      {/* Mass approve + sort + search row */}
+    <div style={{ marginBottom: '16px' }}>
+      {/* Top row: search + approve + sort */}
       <div
         style={{
           display: 'flex',
-          justifyContent: 'space-between',
           alignItems: 'center',
-          marginBottom: '8px',
-          gap: '12px',
+          gap: '10px',
+          marginBottom: '12px',
           flexWrap: 'wrap',
         }}
       >
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-          <button
-            className="btn-secondary"
-            onClick={onMassApprove}
-            disabled={filteredUnapprovedCount === 0}
-            style={{ fontSize: '12px', padding: '4px 12px' }}
+        {/* Search with icon */}
+        <div style={{ position: 'relative', flex: '1 1 200px', maxWidth: '280px' }}>
+          <span
+            style={{
+              position: 'absolute',
+              left: '10px',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              color: 'var(--text-muted)',
+              fontSize: '14px',
+              pointerEvents: 'none',
+            }}
           >
-            ✓ Approve All Visible ({filteredUnapprovedCount})
-          </button>
-
-          {/* Artist search */}
+            🔍
+          </span>
           <input
             value={artistSearch}
             onChange={e => onArtistSearchChange(e.target.value)}
-            placeholder="Filter by artist..."
+            placeholder="Search artists..."
             style={{
-              background: 'var(--bg)',
+              width: '100%',
+              paddingLeft: '32px',
+              paddingRight: '10px',
+              paddingTop: '7px',
+              paddingBottom: '7px',
+              background: 'var(--surface)',
               border: '1px solid var(--border)',
-              borderRadius: '4px',
-              padding: '4px 10px',
+              borderRadius: '20px',
               color: 'var(--text)',
-              fontSize: '12px',
-              width: '180px',
+              fontSize: '13px',
             }}
           />
-
-          {/* Sort dropdown */}
-          <select
-            value={sortBy}
-            onChange={e => onSortByChange(e.target.value as SortBy)}
-            style={{
-              background: 'var(--bg)',
-              border: '1px solid var(--border)',
-              borderRadius: '4px',
-              padding: '4px 10px',
-              color: 'var(--text)',
-              fontSize: '12px',
-            }}
-          >
-            <option value="artist-az">Artist (A–Z)</option>
-            <option value="date-newest">Date (newest first)</option>
-            <option value="date-oldest">Date (oldest first)</option>
-            <option value="health">Health Score</option>
-            <option value="file-count">File Count</option>
-          </select>
         </div>
 
-        <div style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'flex', gap: '12px', flexShrink: 0 }}>
-          <span>⌘A approve all</span>
+        <button
+          className="btn-secondary"
+          onClick={onMassApprove}
+          disabled={filteredUnapprovedCount === 0}
+          style={{ fontSize: '12px', padding: '6px 14px', borderRadius: '20px' }}
+        >
+          ✓ Approve All ({filteredUnapprovedCount})
+        </button>
+
+        {/* Spacer */}
+        <div style={{ flex: 1 }} />
+
+        {/* Sort dropdown */}
+        <select
+          value={sortBy}
+          onChange={e => onSortByChange(e.target.value as SortBy)}
+          style={{
+            background: 'var(--surface)',
+            border: '1px solid var(--border)',
+            borderRadius: '6px',
+            padding: '7px 12px',
+            color: 'var(--text)',
+            fontSize: '12px',
+          }}
+        >
+          <option value="artist-az">Artist A–Z</option>
+          <option value="date-newest">Date: Newest</option>
+          <option value="date-oldest">Date: Oldest</option>
+          <option value="health">Health Score</option>
+          <option value="file-count">File Count</option>
+        </select>
+
+        <div style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'flex', gap: '10px', flexShrink: 0 }}>
+          <span>⌘A approve</span>
           <span>← → navigate</span>
-          <span>Esc close panel</span>
+          <span>Esc close</span>
         </div>
       </div>
 
-      {/* Filter tabs */}
-      <div
-        style={{
-          display: 'flex',
-          gap: '4px',
-          marginBottom: '16px',
-          borderBottom: '1px solid var(--border)',
-          paddingBottom: '0',
-          flexWrap: 'wrap',
-        }}
-      >
-        {tabs.map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => onFilterChange(tab.id)}
-            style={{
-              background: 'none',
-              border: 'none',
-              borderBottom: filter === tab.id ? '2px solid var(--accent)' : '2px solid transparent',
-              color: filter === tab.id ? 'var(--accent)' : 'var(--text-muted)',
-              padding: '8px 16px',
-              fontSize: '13px',
-              cursor: 'pointer',
-              fontWeight: filter === tab.id ? 600 : 400,
-              marginBottom: '-1px',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {tab.label}
-          </button>
-        ))}
+      {/* Filter pill tabs */}
+      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+        {tabs.map(tab => {
+          const isActive = filter === tab.id
+          return (
+            <button
+              key={tab.id}
+              onClick={() => onFilterChange(tab.id)}
+              style={{
+                background: isActive ? 'rgba(108, 99, 255, 0.15)' : 'var(--surface)',
+                border: isActive ? '1px solid rgba(108, 99, 255, 0.4)' : '1px solid var(--border)',
+                borderRadius: '20px',
+                color: isActive ? 'var(--accent)' : 'var(--text-muted)',
+                padding: '5px 14px',
+                fontSize: '12px',
+                cursor: 'pointer',
+                fontWeight: isActive ? 600 : 400,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                transition: 'all 0.15s',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {tab.label}
+              <span
+                style={{
+                  fontSize: '11px',
+                  background: isActive ? 'rgba(108, 99, 255, 0.25)' : 'var(--surface-2)',
+                  color: isActive ? 'var(--accent)' : (tab.count > 0 && tab.color ? tab.color : 'var(--text-muted)'),
+                  borderRadius: '10px',
+                  padding: '1px 7px',
+                  fontWeight: 600,
+                  minWidth: '20px',
+                  textAlign: 'center',
+                }}
+              >
+                {tab.count}
+              </span>
+            </button>
+          )
+        })}
       </div>
     </div>
   )

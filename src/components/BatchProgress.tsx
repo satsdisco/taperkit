@@ -44,103 +44,130 @@ export default function BatchProgress({ approved, results, done }: Props) {
   }
 
   const resultMap = new Map(results.map(r => [r.showId, r]))
+  const barColor = done && failed === 0 ? 'var(--success)' : done && failed > 0 ? 'var(--error)' : 'var(--accent)'
 
   return (
-    <div style={{ padding: '24px', maxWidth: '700px', margin: '0 auto' }}>
-      <div style={{ marginBottom: '20px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '8px' }}>
-          <span style={{ fontWeight: 600 }}>
-            {done ? 'Done' : 'Applying shows...'}
+    <div style={{ padding: '32px 24px', maxWidth: '680px', margin: '0 auto' }}>
+
+      {/* Progress header */}
+      <div style={{ marginBottom: '28px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '12px' }}>
+          <span style={{ fontWeight: 700, fontSize: '18px', color: 'var(--text)' }}>
+            {done
+              ? failed === 0 ? '✓ Done!' : '⚠ Completed with errors'
+              : 'Copying shows...'}
           </span>
-          <span style={{ color: 'var(--text-muted)', fontSize: '13px', display: 'flex', gap: '12px', alignItems: 'baseline' }}>
-            {etaLabel && <span style={{ fontSize: '11px' }}>{etaLabel}</span>}
-            <span style={{ fontWeight: 600, color: 'var(--accent)', fontSize: '15px' }}>{pct}%</span>
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'baseline', color: 'var(--text-muted)', fontSize: '13px' }}>
+            {etaLabel && <span style={{ fontSize: '12px' }}>{etaLabel}</span>}
+            <span style={{ fontWeight: 700, color: barColor, fontSize: '20px' }}>{pct}%</span>
             <span>{completed} / {total}</span>
-          </span>
+          </div>
         </div>
 
-        {/* Progress bar with percentage overlay */}
+        {/* Progress bar */}
         <div
           style={{
-            height: '12px',
+            height: '8px',
             background: 'var(--border)',
-            borderRadius: '6px',
+            borderRadius: '4px',
             overflow: 'hidden',
-            position: 'relative',
           }}
         >
           <div
             style={{
               height: '100%',
               width: `${pct}%`,
-              background: done && failed === 0 ? 'var(--success)' : 'var(--accent)',
-              borderRadius: '6px',
-              transition: 'width 0.3s ease',
+              background: barColor,
+              borderRadius: '4px',
+              transition: 'width 0.4s ease',
             }}
           />
         </div>
-
-        <div style={{ textAlign: 'center', marginTop: '4px', fontSize: '12px', color: 'var(--text-muted)' }}>
-          {completed} of {total} ({pct}%)
-        </div>
       </div>
 
+      {/* Done summary */}
       {done && (
         <div
           style={{
-            padding: '12px 16px',
-            borderRadius: '6px',
-            marginBottom: '20px',
-            background: failed > 0 ? 'rgba(244,67,54,0.1)' : 'rgba(76,175,80,0.1)',
-            border: `1px solid ${failed > 0 ? 'var(--error)' : 'var(--success)'}`,
+            padding: '16px 20px',
+            borderRadius: '10px',
+            marginBottom: '24px',
+            background: failed > 0 ? 'rgba(252, 92, 101, 0.08)' : 'rgba(72, 187, 120, 0.08)',
+            border: `1px solid ${failed > 0 ? 'rgba(252, 92, 101, 0.3)' : 'rgba(72, 187, 120, 0.3)'}`,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '16px',
           }}
         >
-          <span style={{ color: 'var(--success)', fontWeight: 600 }}>{succeeded} succeeded</span>
-          {failed > 0 && (
-            <span style={{ color: 'var(--error)', fontWeight: 600, marginLeft: '12px' }}>
-              {failed} failed
-            </span>
-          )}
+          <span style={{ fontSize: '28px' }}>{failed === 0 ? '🎉' : '⚠️'}</span>
+          <div>
+            <div style={{ fontWeight: 600, fontSize: '15px', marginBottom: '2px' }}>
+              {failed === 0
+                ? `${succeeded} shows copied successfully`
+                : `${succeeded} succeeded, ${failed} failed`}
+            </div>
+            <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+              {failed === 0
+                ? 'Your library is ready in Jellyfin'
+                : 'Check the errors below for details'}
+            </div>
+          </div>
         </div>
       )}
 
       {/* Per-show status */}
-      <div>
-        {approved.map(s => {
+      <div
+        style={{
+          background: 'var(--surface)',
+          border: '1px solid var(--border)',
+          borderRadius: '10px',
+          overflow: 'hidden',
+        }}
+      >
+        {approved.map((s, i) => {
           const result = resultMap.get(s.showId)
           const isPending = !result
           const isSuccess = result?.success
+          const isLast = i === approved.length - 1
           return (
             <div
               key={s.showId}
               style={{
                 display: 'flex',
                 alignItems: 'flex-start',
-                gap: '10px',
-                padding: '8px 0',
-                borderBottom: '1px solid var(--border)',
+                gap: '12px',
+                padding: '12px 16px',
+                borderBottom: isLast ? 'none' : '1px solid var(--border)',
+                background: isSuccess
+                  ? 'rgba(72, 187, 120, 0.03)'
+                  : result && !isSuccess
+                    ? 'rgba(252, 92, 101, 0.04)'
+                    : 'transparent',
               }}
             >
-              <div style={{ marginTop: '2px', flexShrink: 0, fontSize: '14px' }}>
+              {/* Status icon */}
+              <div style={{ marginTop: '1px', flexShrink: 0, width: '18px', textAlign: 'center' }}>
                 {isPending ? (
-                  <span style={{ color: 'var(--text-muted)' }}>○</span>
+                  <span style={{ color: 'var(--border)', fontSize: '14px' }}>○</span>
                 ) : isSuccess ? (
-                  <span style={{ color: 'var(--success)' }}>✓</span>
+                  <span style={{ color: 'var(--success)', fontSize: '14px' }}>✓</span>
                 ) : (
-                  <span style={{ color: 'var(--error)' }}>✗</span>
+                  <span style={{ color: 'var(--error)', fontSize: '14px' }}>✗</span>
                 )}
               </div>
+
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: '13px', fontWeight: 500 }}>
-                  {s.artist} — {s.date}
+                <div style={{ fontWeight: 500, fontSize: '13px', color: isPending ? 'var(--text-muted)' : 'var(--text)' }}>
+                  {s.artist}
+                  {s.date && <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}> — {s.date}</span>}
                 </div>
                 {result?.destinationPath && (
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'monospace', marginTop: '2px' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'monospace', marginTop: '3px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     → {result.destinationPath}
                   </div>
                 )}
                 {result?.error && (
-                  <div style={{ fontSize: '12px', color: 'var(--error)', marginTop: '2px' }}>
+                  <div style={{ fontSize: '12px', color: 'var(--error)', marginTop: '3px' }}>
                     {result.error}
                   </div>
                 )}

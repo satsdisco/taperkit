@@ -37,7 +37,7 @@ export default function ScanConfig({
       style={{
         background: 'var(--surface)',
         border: '1px solid var(--border)',
-        borderRadius: '8px',
+        borderRadius: '12px',
         marginBottom: '24px',
         overflow: 'hidden',
       }}
@@ -45,7 +45,7 @@ export default function ScanConfig({
       {/* Accordion header */}
       <div
         style={{
-          padding: '12px 20px',
+          padding: '14px 20px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
@@ -54,7 +54,10 @@ export default function ScanConfig({
         }}
         onClick={hasResults ? onToggleCollapse : undefined}
       >
-        <span style={{ fontWeight: 600, fontSize: '14px' }}>Source Configuration</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <span style={{ fontSize: '16px' }}>📁</span>
+          <span style={{ fontWeight: 600, fontSize: '14px' }}>Source Configuration</span>
+        </div>
         {hasResults && (
           <button
             style={{
@@ -72,112 +75,136 @@ export default function ScanConfig({
       </div>
 
       {!isCollapsed && (
-        <div style={{ padding: '0 20px 20px' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '8px', marginBottom: '12px' }}>
-            {sources.folders.map((folder, idx) => (
-              <div key={idx} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <label
-                  style={{
-                    width: '70px',
-                    fontSize: '11px',
-                    color: 'var(--text-muted)',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.5px',
-                    flexShrink: 0,
-                  }}
-                >
-                  Source {idx + 1}
-                </label>
-                <input
-                  value={folder}
-                  onChange={e => onFolderUpdate(idx, e.target.value)}
-                  placeholder="/path/to/music folder"
-                  style={{
-                    flex: 1,
-                    background: 'var(--bg)',
-                    border: '1px solid var(--border)',
-                    borderRadius: '4px',
-                    padding: '6px 10px',
-                    color: 'var(--text)',
-                    fontSize: '13px',
-                    fontFamily: 'monospace',
-                  }}
-                />
-                <button
-                  className="btn-secondary"
-                  style={{ fontSize: '12px', padding: '5px 10px', flexShrink: 0 }}
-                  onClick={() => onBrowse(idx)}
-                >
-                  Browse
-                </button>
-                <button
-                  onClick={() => onFolderRemove(idx)}
-                  title="Remove this source"
-                  style={{
-                    background: 'none',
-                    border: '1px solid var(--border)',
-                    borderRadius: '4px',
-                    color: 'var(--error)',
-                    cursor: 'pointer',
-                    padding: '5px 8px',
-                    fontSize: '14px',
-                    flexShrink: 0,
-                  }}
-                >
-                  ✕
-                </button>
-              </div>
-            ))}
-          </div>
+        <div style={{ padding: '0 20px 24px' }}>
+          {/* Divider */}
+          <div style={{ height: '1px', background: 'var(--border)', marginBottom: '20px' }} />
 
-          <button
-            className="btn-secondary"
-            style={{ fontSize: '12px', marginBottom: '16px' }}
-            onClick={onFolderAdd}
-          >
-            + Add Source Folder
-          </button>
-
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '8px' }}>
-            <label
-              style={{
-                width: '70px',
-                fontSize: '11px',
-                color: 'var(--text-muted)',
-                textTransform: 'uppercase',
-                letterSpacing: '0.5px',
-                flexShrink: 0,
-              }}
-            >
-              Destination
-            </label>
-            <input
-              value={sources.destination}
-              onChange={e => onDestinationChange(e.target.value)}
-              placeholder="/path/to/New Music Library"
-              style={{
-                flex: 1,
-                background: 'var(--bg)',
-                border: '1px solid var(--border)',
-                borderRadius: '4px',
-                padding: '6px 10px',
-                color: 'var(--text)',
-                fontSize: '13px',
-                fontFamily: 'monospace',
-              }}
-            />
+          {/* Source folders */}
+          <div style={{ marginBottom: '16px' }}>
+            <div className="section-label" style={{ marginBottom: '10px' }}>Source Folders</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {sources.folders.map((folder, idx) => (
+                <div key={idx} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <div
+                    style={{
+                      width: '22px',
+                      height: '22px',
+                      borderRadius: '50%',
+                      background: 'var(--surface-2)',
+                      border: '1px solid var(--border)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '11px',
+                      color: 'var(--text-muted)',
+                      flexShrink: 0,
+                      fontWeight: 600,
+                    }}
+                  >
+                    {idx + 1}
+                  </div>
+                  <input
+                    value={folder}
+                    onChange={e => onFolderUpdate(idx, e.target.value)}
+                    placeholder="/path/to/music folder"
+                    style={{
+                      flex: 1,
+                      background: 'var(--bg)',
+                      border: '1px solid var(--border)',
+                      borderRadius: '6px',
+                      padding: '7px 11px',
+                      color: 'var(--text)',
+                      fontSize: '13px',
+                      fontFamily: 'monospace',
+                    }}
+                  />
+                  <button
+                    className="btn-secondary"
+                    style={{ fontSize: '12px', padding: '6px 12px', flexShrink: 0 }}
+                    onClick={() => onBrowse(idx)}
+                  >
+                    Browse
+                  </button>
+                  <button
+                    onClick={() => onFolderRemove(idx)}
+                    title="Remove this source"
+                    style={{
+                      background: 'none',
+                      border: '1px solid var(--border)',
+                      borderRadius: '6px',
+                      color: 'var(--error)',
+                      cursor: 'pointer',
+                      padding: '6px 10px',
+                      fontSize: '13px',
+                      flexShrink: 0,
+                      opacity: 0.7,
+                    }}
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
             <button
               className="btn-secondary"
-              style={{ fontSize: '12px', padding: '5px 10px', flexShrink: 0 }}
-              onClick={() => onBrowse('destination')}
+              style={{ fontSize: '12px', marginTop: '10px', borderRadius: '6px' }}
+              onClick={onFolderAdd}
             >
-              Browse
+              + Add Source Folder
             </button>
           </div>
 
-          <div style={{ marginTop: '16px', display: 'flex', gap: '12px', alignItems: 'center' }}>
-            <button className="btn-primary" onClick={onScan}>
-              Scan Library
+          {/* Destination */}
+          <div style={{ marginBottom: '20px' }}>
+            <div className="section-label" style={{ marginBottom: '10px' }}>Jellyfin Destination</div>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <input
+                value={sources.destination}
+                onChange={e => onDestinationChange(e.target.value)}
+                placeholder="/path/to/New Music Library"
+                style={{
+                  flex: 1,
+                  background: 'var(--bg)',
+                  border: '1px solid var(--border)',
+                  borderRadius: '6px',
+                  padding: '7px 11px',
+                  color: 'var(--text)',
+                  fontSize: '13px',
+                  fontFamily: 'monospace',
+                }}
+              />
+              <button
+                className="btn-secondary"
+                style={{ fontSize: '12px', padding: '6px 12px', flexShrink: 0 }}
+                onClick={() => onBrowse('destination')}
+              >
+                Browse
+              </button>
+            </div>
+            {sources.destination && (
+              <div style={{ marginTop: '6px', fontSize: '11px', color: 'var(--text-muted)' }}>
+                Output: <span style={{ color: 'var(--accent)', fontFamily: 'monospace' }}>
+                  {sources.destination}/Artist/YYYY-MM-DD Venue, City, ST/
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* CTA */}
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+            <button
+              className="btn-primary"
+              onClick={onScan}
+              style={{
+                padding: '10px 28px',
+                fontSize: '14px',
+                borderRadius: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+              }}
+            >
+              <span>▶</span> Scan Library
             </button>
             {error && (
               <span style={{ color: 'var(--error)', fontSize: '13px' }}>{error}</span>
@@ -186,11 +213,19 @@ export default function ScanConfig({
         </div>
       )}
 
+      {/* Collapsed summary */}
       {isCollapsed && (
-        <div style={{ padding: '0 20px 12px', fontSize: '12px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
-          {sources.folders.filter(Boolean).join(' · ')}
+        <div style={{ padding: '0 20px 14px', fontSize: '12px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+          {sources.folders.filter(Boolean).map((f, i) => (
+            <span key={i}>
+              {i > 0 && <span style={{ margin: '0 6px', opacity: 0.4 }}>·</span>}
+              {f.split('/').pop()}
+            </span>
+          ))}
           {sources.destination && (
-            <span style={{ color: 'var(--accent)', marginLeft: '8px' }}>→ {sources.destination.split('/').pop()}</span>
+            <span style={{ color: 'var(--accent)', marginLeft: '8px' }}>
+              → {sources.destination.split('/').pop()}
+            </span>
           )}
         </div>
       )}
