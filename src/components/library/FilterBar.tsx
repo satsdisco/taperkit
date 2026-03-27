@@ -144,8 +144,8 @@ export default function FilterBar({
               key={tab.id}
               onClick={() => onFilterChange(tab.id)}
               style={{
-                background: isActive ? 'rgba(108, 99, 255, 0.15)' : 'var(--surface)',
-                border: isActive ? '1px solid rgba(108, 99, 255, 0.4)' : '1px solid var(--border)',
+                background: isActive ? 'rgba(233, 69, 96, 0.15)' : 'var(--surface)',
+                border: isActive ? '1px solid rgba(233, 69, 96, 0.4)' : '1px solid var(--border)',
                 borderRadius: '20px',
                 color: isActive ? 'var(--accent)' : 'var(--text-muted)',
                 padding: '5px 14px',
@@ -163,7 +163,7 @@ export default function FilterBar({
               <span
                 style={{
                   fontSize: '11px',
-                  background: isActive ? 'rgba(108, 99, 255, 0.25)' : 'var(--surface-2)',
+                  background: isActive ? 'rgba(233, 69, 96, 0.25)' : 'var(--surface-2)',
                   color: isActive ? 'var(--accent)' : (tab.count > 0 && tab.color ? tab.color : 'var(--text-muted)'),
                   borderRadius: '10px',
                   padding: '1px 7px',

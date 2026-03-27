@@ -7,8 +7,8 @@
   --surface: #1a1d27;
   --surface-2: #222538;
   --border: #2a2d3e;
-  --accent: #6c63ff;
-  --accent-hover: #5a52e0;
+  --accent: #e94560;
+  --accent-hover: #d63352;
   --text: #e2e8f0;
   --text-muted: #7c8db0;
   --success: #48bb78;
@@ -24,8 +24,8 @@ body {
   margin: 0;
   background-color: var(--bg);
   background-image:
-    radial-gradient(ellipse at 15% 60%, rgba(108, 99, 255, 0.06) 0%, transparent 55%),
-    radial-gradient(ellipse at 85% 10%, rgba(108, 99, 255, 0.04) 0%, transparent 45%);
+    radial-gradient(ellipse at 15% 60%, rgba(233, 69, 96, 0.06) 0%, transparent 55%),
+    radial-gradient(ellipse at 85% 10%, rgba(233, 69, 96, 0.04) 0%, transparent 45%);
   background-attachment: fixed;
   color: var(--text);
   font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -43,7 +43,7 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--border);
+  background: rgba(233, 69, 96, 0.3);
   border-radius: 3px;
 }
 
@@ -65,7 +65,7 @@ input, textarea, select {
 
 input:focus, textarea:focus, select:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(108, 99, 255, 0.12);
+  box-shadow: 0 0 0 3px rgba(233, 69, 96, 0.12);
 }
 
 input::placeholder, textarea::placeholder {
@@ -97,7 +97,7 @@ button:disabled {
 
 .btn-primary:hover:not(:disabled) {
   background-color: var(--accent-hover);
-  box-shadow: 0 4px 12px rgba(108, 99, 255, 0.3);
+  box-shadow: 0 4px 12px rgba(233, 69, 96, 0.3);
 }
 
 .btn-secondary {
@@ -110,7 +110,7 @@ button:disabled {
 .btn-secondary:hover:not(:disabled) {
   border-color: var(--accent);
   color: var(--accent);
-  background-color: rgba(108, 99, 255, 0.06);
+  background-color: rgba(233, 69, 96, 0.06);
 }
 
 .inline-edit {

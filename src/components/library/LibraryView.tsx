@@ -14,20 +14,28 @@ import ApprovedQueue from './ApprovedQueue'
 import { useToast } from '../shared/Toast'
 
 const DEFAULT_SOURCES = {
-  folders: [
-    '/Volumes/External/media/1 Music',
-    '/Volumes/External/media/1 Music.backup.20260213',
-  ],
-  destination: '/Volumes/External/media/New Music Library',
+  folders: [''],
+  destination: '',
 }
 
 type Step = 'config' | 'scanning' | 'results' | 'applying'
 
-export default function LibraryView() {
+interface LibraryViewProps {
+  libraryPath?: string
+  onLibraryPathChange?: (path: string) => void
+  onSwitchToQuickTag?: () => void
+}
+
+export default function LibraryView({ libraryPath, onLibraryPathChange, onSwitchToQuickTag }: LibraryViewProps) {
   const { addToast } = useToast()
 
   const [step, setStep] = useState<Step>('config')
-  const [sources, setSources] = useState(DEFAULT_SOURCES)
+  const [sources, setSources] = useState(() => {
+    const path = libraryPath || ''
+    return path
+      ? { ...DEFAULT_SOURCES, folders: [path] }
+      : DEFAULT_SOURCES
+  })
   const [scanMsg, setScanMsg] = useState('')
   const [scanCount, setScanCount] = useState(0)
   const [shows, setShows] = useState<LibraryShow[]>([])
@@ -109,7 +117,21 @@ export default function LibraryView() {
           folders[field as number] = data.path
           return { ...prev, folders }
         })
+        // Save first source folder as the library path
+        if (field === 0) {
+          onLibraryPathChange?.(data.path)
+        }
       }
+    } catch { /* ignore */ }
+  }
+
+  const browseLibraryPath = async () => {
+    try {
+      const res = await fetch('/api/browse')
+      const data = await res.json()
+      if (!data.path) return
+      onLibraryPathChange?.(data.path)
+      setSources(prev => ({ ...prev, folders: [data.path] }))
     } catch { /* ignore */ }
   }
 
@@ -426,6 +448,121 @@ export default function LibraryView() {
 
   // --- Render ---
 
+  // Welcome / onboarding screen — shown when no library path is configured
+  if (!libraryPath && step === 'config') {
+    return (
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minHeight: 'calc(100vh - 52px)',
+          padding: '40px 24px',
+        }}
+      >
+        {/* Brand mark */}
+        <div style={{ textAlign: 'center', marginBottom: '48px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', marginBottom: '16px' }}>
+            <div
+              style={{
+                width: '52px',
+                height: '52px',
+                borderRadius: '14px',
+                backgroundColor: 'var(--accent)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontWeight: 900,
+                fontSize: '30px',
+                color: '#fff',
+                boxShadow: '0 4px 20px rgba(233, 69, 96, 0.4)',
+              }}
+            >
+              T
+            </div>
+            <span style={{ fontSize: '36px', fontWeight: 800, color: 'var(--text)', letterSpacing: '-1px' }}>
+              aperKit
+            </span>
+          </div>
+          <p style={{ color: 'var(--text-muted)', margin: 0, fontSize: '16px', letterSpacing: '-0.2px' }}>
+            Your live music, beautifully organized
+          </p>
+        </div>
+
+        {/* Action cards */}
+        <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', justifyContent: 'center', marginBottom: '32px', width: '100%', maxWidth: '600px' }}>
+          {/* Set Up Library */}
+          <button
+            onClick={browseLibraryPath}
+            style={{
+              flex: '1 1 220px',
+              background: 'var(--accent)',
+              border: 'none',
+              borderRadius: '12px',
+              padding: '28px 24px',
+              cursor: 'pointer',
+              textAlign: 'left',
+              color: '#fff',
+              boxShadow: '0 4px 20px rgba(233, 69, 96, 0.35)',
+              transition: 'transform 0.15s, box-shadow 0.15s',
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.transform = 'translateY(-2px)'
+              e.currentTarget.style.boxShadow = '0 8px 28px rgba(233, 69, 96, 0.5)'
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.transform = 'translateY(0)'
+              e.currentTarget.style.boxShadow = '0 4px 20px rgba(233, 69, 96, 0.35)'
+            }}
+          >
+            <div style={{ fontSize: '28px', marginBottom: '10px' }}>📁</div>
+            <div style={{ fontWeight: 700, fontSize: '15px', marginBottom: '6px' }}>Set Up Library</div>
+            <div style={{ fontSize: '13px', opacity: 0.85, lineHeight: 1.4 }}>
+              Choose your live recordings folder to scan and organize your whole collection
+            </div>
+          </button>
+
+          {/* Quick Tag */}
+          <button
+            onClick={onSwitchToQuickTag}
+            style={{
+              flex: '1 1 220px',
+              background: 'var(--surface)',
+              border: '1px solid var(--border)',
+              borderRadius: '12px',
+              padding: '28px 24px',
+              cursor: 'pointer',
+              textAlign: 'left',
+              color: 'var(--text)',
+              transition: 'transform 0.15s, border-color 0.15s, box-shadow 0.15s',
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.transform = 'translateY(-2px)'
+              e.currentTarget.style.borderColor = 'var(--accent)'
+              e.currentTarget.style.boxShadow = '0 4px 16px rgba(233, 69, 96, 0.15)'
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.transform = 'translateY(0)'
+              e.currentTarget.style.borderColor = 'var(--border)'
+              e.currentTarget.style.boxShadow = 'none'
+            }}
+          >
+            <div style={{ fontSize: '28px', marginBottom: '10px' }}>⚡</div>
+            <div style={{ fontWeight: 700, fontSize: '15px', marginBottom: '6px' }}>Quick Tag</div>
+            <div style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.4 }}>
+              Tag a single recording folder right now — no library setup needed
+            </div>
+          </button>
+        </div>
+
+        <p style={{ color: 'var(--text-muted)', fontSize: '13px', margin: 0 }}>
+          Already have a library? Select your folder above.
+        </p>
+      </div>
+    )
+  }
+
   if (step === 'scanning') {
     return (
       <div
@@ -505,6 +642,62 @@ export default function LibraryView() {
         transition: 'padding-right 0.3s ease, max-width 0.3s ease, margin 0.3s ease',
       }}
     >
+      {/* Library path display */}
+      {libraryPath && step !== 'results' && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            marginBottom: '16px',
+            padding: '10px 14px',
+            background: 'var(--surface)',
+            border: '1px solid var(--border)',
+            borderLeft: '3px solid var(--accent)',
+            borderRadius: '8px',
+          }}
+        >
+          <span style={{ fontSize: '13px', color: 'var(--text-muted)', flexShrink: 0 }}>Library:</span>
+          <span
+            style={{
+              fontFamily: 'monospace',
+              fontSize: '12px',
+              color: 'var(--text)',
+              flex: 1,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {libraryPath}
+          </span>
+          <button
+            onClick={browseLibraryPath}
+            style={{
+              background: 'none',
+              border: '1px solid var(--border)',
+              borderRadius: '5px',
+              color: 'var(--text-muted)',
+              fontSize: '11px',
+              padding: '3px 8px',
+              cursor: 'pointer',
+              flexShrink: 0,
+              transition: 'border-color 0.15s, color 0.15s',
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.borderColor = 'var(--accent)'
+              e.currentTarget.style.color = 'var(--accent)'
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.borderColor = 'var(--border)'
+              e.currentTarget.style.color = 'var(--text-muted)'
+            }}
+          >
+            Change
+          </button>
+        </div>
+      )}
+
       <ScanConfig
         sources={sources}
         onFolderUpdate={updateFolder}
@@ -531,17 +724,18 @@ export default function LibraryView() {
             }}
           >
             {[
-              { label: 'Total', value: shows.length, color: 'var(--text)', icon: '🎵' },
-              { label: 'Need Review', value: shows.filter(s => !s.alreadyDone && s.healthScore < 70).length, color: 'var(--warning)', icon: '⚠' },
-              { label: 'Duplicates', value: duplicateGroups.length, color: 'var(--warning)', icon: '⊕' },
-              { label: 'Ready', value: shows.filter(s => !s.alreadyDone && s.healthScore >= 70).length, color: 'var(--success)', icon: '✓' },
-              { label: 'In Library', value: shows.filter(s => s.alreadyDone).length, color: 'var(--text-muted)', icon: '📁' },
+              { label: 'Total', value: shows.length, color: 'var(--accent)', primary: true },
+              { label: 'Need Review', value: shows.filter(s => !s.alreadyDone && s.healthScore < 70).length, color: 'var(--warning)', primary: false },
+              { label: 'Duplicates', value: duplicateGroups.length, color: 'var(--warning)', primary: false },
+              { label: 'Ready', value: shows.filter(s => !s.alreadyDone && s.healthScore >= 70).length, color: 'var(--success)', primary: false },
+              { label: 'In Library', value: shows.filter(s => s.alreadyDone).length, color: 'var(--text-muted)', primary: false },
             ].map(card => (
               <div
                 key={card.label}
                 style={{
                   background: 'var(--surface)',
                   border: '1px solid var(--border)',
+                  borderLeft: card.primary ? '3px solid var(--accent)' : '1px solid var(--border)',
                   borderRadius: '10px',
                   padding: '14px 20px',
                   display: 'flex',

@@ -46,98 +46,137 @@ export default function FolderPicker({ onFolderSelect, error }: FolderPickerProp
         minHeight: '80vh',
       }}
     >
-      <div style={{ width: '100%', maxWidth: '600px', padding: '0 24px' }}>
-        {/* Title */}
-        <div style={{ textAlign: 'center', marginBottom: '48px' }}>
+      <div style={{ width: '100%', maxWidth: '560px', padding: '0 24px' }}>
+        {/* Heading */}
+        <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+          <div style={{ fontSize: '40px', marginBottom: '16px' }}>⚡</div>
           <h1
             style={{
-              fontSize: '36px',
+              fontSize: '24px',
               fontWeight: 800,
-              color: 'var(--accent)',
-              letterSpacing: '-1px',
-              margin: '0 0 8px 0',
+              color: 'var(--text)',
+              letterSpacing: '-0.5px',
+              margin: '0 0 10px 0',
             }}
           >
-            TaperKit
+            Tag a Recording
           </h1>
-          <p style={{ color: 'var(--text-muted)', margin: 0, fontSize: '15px' }}>
-            Organise and tag your live music recordings for Jellyfin
+          <p style={{ color: 'var(--text-muted)', margin: 0, fontSize: '14px', lineHeight: 1.5 }}>
+            Select a folder containing a live recording to clean up and tag
           </p>
         </div>
 
-        {/* Folder input */}
+        {/* Browse action */}
         <div
           style={{
             backgroundColor: 'var(--surface)',
             border: '1px solid var(--border)',
-            borderRadius: '8px',
-            padding: '24px',
-            marginBottom: '24px',
+            borderRadius: '12px',
+            padding: '28px 24px',
+            marginBottom: '20px',
+            textAlign: 'center',
           }}
         >
-          <label
+          <button
+            type="button"
+            onClick={handleBrowse}
+            className="btn-primary"
             style={{
-              display: 'block',
-              color: 'var(--text-muted)',
-              fontSize: '12px',
-              fontWeight: 600,
-              textTransform: 'uppercase',
-              letterSpacing: '0.5px',
-              marginBottom: '10px',
+              padding: '12px 32px',
+              fontSize: '15px',
+              fontWeight: 700,
+              borderRadius: '8px',
+              marginBottom: inputValue ? '16px' : '0',
             }}
           >
-            Show folder path
-          </label>
+            Browse Folder
+          </button>
+
+          {/* Path display after selection */}
+          {inputValue && (
+            <form onSubmit={handleSubmit}>
+              <div
+                style={{
+                  background: 'var(--bg)',
+                  border: '1px solid var(--border)',
+                  borderRadius: '6px',
+                  padding: '10px 14px',
+                  marginBottom: '14px',
+                  fontFamily: 'monospace',
+                  fontSize: '12px',
+                  color: 'var(--text)',
+                  textAlign: 'left',
+                  wordBreak: 'break-all',
+                  lineHeight: 1.5,
+                }}
+              >
+                {inputValue}
+              </div>
+              <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                <button
+                  type="submit"
+                  className="btn-primary"
+                  style={{ padding: '9px 28px', fontSize: '14px' }}
+                >
+                  Open →
+                </button>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => setInputValue('')}
+                  style={{ padding: '9px 16px', fontSize: '14px' }}
+                >
+                  Clear
+                </button>
+              </div>
+            </form>
+          )}
+
+          {!inputValue && (
+            <p style={{ margin: '12px 0 0 0', fontSize: '12px', color: 'var(--text-muted)' }}>
+              Or paste a path manually below
+            </p>
+          )}
+        </div>
+
+        {/* Manual input */}
+        {!inputValue && (
           <form onSubmit={handleSubmit}>
             <div style={{ display: 'flex', gap: '8px' }}>
               <input
                 type="text"
                 value={inputValue}
                 onChange={e => setInputValue(e.target.value)}
-                placeholder="/Users/you/Music/Shows/2025-11-22 Town Ballroom..."
-                style={{ flex: 1, padding: '10px 14px', fontSize: '14px' }}
-                autoFocus
+                placeholder="/path/to/2025-11-22 Town Ballroom..."
+                style={{ flex: 1, padding: '10px 14px', fontSize: '13px', fontFamily: 'monospace' }}
               />
-              <button
-                type="button"
-                onClick={handleBrowse}
-                className="btn-secondary"
-                style={{ whiteSpace: 'nowrap', padding: '10px 16px' }}
-              >
-                Browse
-              </button>
               <button
                 type="submit"
                 className="btn-primary"
                 disabled={!inputValue.trim()}
-                style={{ whiteSpace: 'nowrap', padding: '10px 20px' }}
+                style={{ whiteSpace: 'nowrap', padding: '10px 18px' }}
               >
                 Open
               </button>
             </div>
           </form>
+        )}
 
-          {error && (
-            <div
-              style={{
-                marginTop: '12px',
-                padding: '10px 14px',
-                backgroundColor: 'rgba(244, 67, 54, 0.1)',
-                border: '1px solid rgba(244, 67, 54, 0.3)',
-                borderRadius: '4px',
-                color: 'var(--error)',
-                fontSize: '13px',
-              }}
-            >
-              {error}
-            </div>
-          )}
-
-          <p style={{ margin: '12px 0 0 0', fontSize: '12px', color: 'var(--text-muted)' }}>
-            Tip: Paste the full path to a folder containing FLAC or MP3 files.
-            Disc subfolders (Disc 1/, disc1/, Set 1/) are detected automatically.
-          </p>
-        </div>
+        {error && (
+          <div
+            style={{
+              marginTop: '12px',
+              padding: '10px 14px',
+              backgroundColor: 'rgba(233, 69, 96, 0.1)',
+              border: '1px solid rgba(233, 69, 96, 0.3)',
+              borderRadius: '6px',
+              color: 'var(--error)',
+              fontSize: '13px',
+            }}
+          >
+            {error}
+          </div>
+        )}
 
         {/* Recent folders */}
         {recents.length > 0 && (
@@ -147,20 +186,21 @@ export default function FolderPicker({ onFolderSelect, error }: FolderPickerProp
               border: '1px solid var(--border)',
               borderRadius: '8px',
               overflow: 'hidden',
+              marginTop: '20px',
             }}
           >
             <div
               style={{
-                padding: '12px 16px',
+                padding: '10px 16px',
                 borderBottom: '1px solid var(--border)',
                 color: 'var(--text-muted)',
-                fontSize: '12px',
+                fontSize: '11px',
                 fontWeight: 600,
                 textTransform: 'uppercase',
-                letterSpacing: '0.5px',
+                letterSpacing: '0.06em',
               }}
             >
-              Recent folders
+              Recent
             </div>
             {recents.map((folder, idx) => (
               <button
@@ -173,14 +213,14 @@ export default function FolderPicker({ onFolderSelect, error }: FolderPickerProp
                   background: 'none',
                   border: 'none',
                   borderBottom: idx < recents.length - 1 ? '1px solid var(--border)' : 'none',
-                  padding: '12px 16px',
+                  padding: '11px 16px',
                   color: 'var(--text)',
-                  fontSize: '13px',
+                  fontSize: '12px',
                   fontFamily: 'monospace',
                   cursor: 'pointer',
                   transition: 'background-color 0.15s',
                 }}
-                onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'rgba(255, 140, 66, 0.08)')}
+                onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'rgba(233, 69, 96, 0.06)')}
                 onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
               >
                 <span style={{ color: 'var(--accent)', marginRight: '8px' }}>→</span>

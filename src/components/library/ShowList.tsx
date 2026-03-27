@@ -135,7 +135,7 @@ function ShowRow({ show, dupInfo, isApproved, isSkipped, onReview, onQuickApprov
   let rowBg = 'transparent'
   if (isApproved) rowBg = 'rgba(72, 187, 120, 0.04)'
   if (isSkipped) rowBg = 'rgba(0, 0, 0, 0.15)'
-  if (hovered && !isSkipped) rowBg = 'rgba(108, 99, 255, 0.04)'
+  if (hovered && !isSkipped) rowBg = 'rgba(233, 69, 96, 0.04)'
 
   return (
     <div
@@ -194,9 +194,9 @@ function ShowRow({ show, dupInfo, isApproved, isSkipped, onReview, onQuickApprov
                 fontSize: '10px',
                 padding: '2px 8px',
                 borderRadius: '10px',
-                background: 'rgba(108, 99, 255, 0.12)',
+                background: 'rgba(233, 69, 96, 0.12)',
                 color: 'var(--accent)',
-                border: '1px solid rgba(108, 99, 255, 0.3)',
+                border: '1px solid rgba(233, 69, 96, 0.3)',
                 fontWeight: 600,
               }}
             >
