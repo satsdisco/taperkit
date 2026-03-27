@@ -56,6 +56,10 @@ export function parseDiscFromFolder(folderName: string): number | null {
   const discMatch = lower.match(/^disc\s*(\d+)$/)
   if (discMatch) return parseInt(discMatch[1], 10)
 
+  // "CD 01", "cd1", "CD 02"
+  const cdMatch = lower.match(/^cd\s*(\d+)$/)
+  if (cdMatch) return parseInt(cdMatch[1], 10)
+
   // "d1", "d2"
   const dMatch = lower.match(/^d(\d+)$/)
   if (dMatch) return parseInt(dMatch[1], 10)

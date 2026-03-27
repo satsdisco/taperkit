@@ -498,8 +498,31 @@ export async function scanLibrary(
           if (show) { allShows.push(markDone(show)); current++ }
         }
 
+        // Check if ALL show subdirs are disc folders (CD 01, CD 02, Disc 1, etc.)
+        // If so, this IS the album folder — build a single show from it, not separate per-disc shows
+        const allShowDirsAreDiscs = showDirs.length > 0 && showDirs.every(e => parseDiscFromFolder(e.name) !== null)
+        if (allShowDirsAreDiscs) {
+          onEvent({ type: 'progress', msg: `Scanning: ${artistDir.name} (multi-disc)`, current })
+          const show = await buildShow(artistPath, sourceRoot, null)
+          if (show) { allShows.push(markDone(show)); current++ }
+          continue
+        }
+
         for (const showDir of showDirs) {
           const showPath = path.join(artistPath, showDir.name)
+          // Check if this show folder's children are all disc folders
+          try {
+            const showSubdirs = fs.readdirSync(showPath, { withFileTypes: true }).filter(e => e.isDirectory())
+            const showHasAudio = fs.readdirSync(showPath, { withFileTypes: true }).some(e => e.isFile() && AUDIO_EXTENSIONS.includes(path.extname(e.name).toLowerCase()))
+            if (!showHasAudio && showSubdirs.length > 0 && showSubdirs.every(e => parseDiscFromFolder(e.name) !== null)) {
+              // Multi-disc album inside artist/show folder
+              onEvent({ type: 'progress', msg: `Scanning: ${artistDir.name} / ${showDir.name} (multi-disc)`, current })
+              const show = await buildShow(showPath, sourceRoot, artistDir.name)
+              if (show) { allShows.push(markDone(show)); current++ }
+              continue
+            }
+          } catch { /* fall through to normal handling */ }
+
           onEvent({ type: 'progress', msg: `Scanning: ${artistDir.name} / ${showDir.name}`, current })
           const show = await buildShow(showPath, sourceRoot, artistDir.name)
           if (show) {
