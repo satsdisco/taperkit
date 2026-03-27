@@ -46,6 +46,7 @@ export default function LibraryView() {
   const [sortBy, setSortBy] = useState<SortBy>('artist-az')
   const [configCollapsed, setConfigCollapsed] = useState(false)
   const [quickApprovingIds, setQuickApprovingIds] = useState<Set<string>>(new Set())
+  const [panelWidth, setPanelWidth] = useState(480)
   const esRef = useRef<EventSource | null>(null)
   const cleanAfterApplyRef = useRef(false)
 
@@ -498,7 +499,7 @@ export default function LibraryView() {
     <div
       style={{
         padding: '24px',
-        paddingRight: reviewShow ? 'calc(420px + 24px)' : '24px',
+        paddingRight: reviewShow ? `calc(${panelWidth}px + 24px)` : '24px',
         maxWidth: reviewShow ? 'none' : '1100px',
         margin: reviewShow ? '0' : '0 auto',
         transition: 'padding-right 0.3s ease, max-width 0.3s ease, margin 0.3s ease',
@@ -710,6 +711,7 @@ export default function LibraryView() {
           onApprove={handleApprove}
           onSkip={handleSkip}
           destinationRoot={sources.destination}
+          onWidthChange={setPanelWidth}
         />
       )}
     </div>

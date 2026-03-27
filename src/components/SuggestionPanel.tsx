@@ -2,12 +2,17 @@ import React, { useState, useEffect, useRef } from 'react'
 import { LibraryShow, LibraryShowSuggestion } from '../types'
 import ArtworkPicker from './ArtworkPicker'
 
+const PANEL_MIN = 380
+const PANEL_MAX = 700
+const PANEL_DEFAULT = 480
+
 interface Props {
   show: LibraryShow
   onClose: () => void
   onApprove: (suggestion: LibraryShowSuggestion) => void
   onSkip: () => void
   destinationRoot?: string
+  onWidthChange?: (width: number) => void
 }
 
 const fieldStyle: React.CSSProperties = {
@@ -18,6 +23,7 @@ const fieldStyle: React.CSSProperties = {
   padding: '7px 10px',
   color: 'var(--text)',
   fontSize: '13px',
+  boxSizing: 'border-box',
 }
 
 const labelStyle: React.CSSProperties = {
@@ -29,16 +35,51 @@ const labelStyle: React.CSSProperties = {
   marginBottom: '5px',
 }
 
+const sectionStyle: React.CSSProperties = {
+  paddingTop: '16px',
+  paddingBottom: '16px',
+  borderBottom: '1px solid var(--border)',
+}
+
 type SuggestionWithMb = LibraryShowSuggestion & { mbArtworkUrl?: string }
 
-export default function SuggestionPanel({ show, onClose, onApprove, onSkip, destinationRoot }: Props) {
+export default function SuggestionPanel({ show, onClose, onApprove, onSkip, destinationRoot, onWidthChange }: Props) {
   const [suggestion, setSuggestion] = useState<SuggestionWithMb | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [mbSearching, setMbSearching] = useState(false)
   const [mbError, setMbError] = useState<string | null>(null)
   const [existingArtworkUrl, setExistingArtworkUrl] = useState<string | null>(null)
+  const [panelWidth, setPanelWidth] = useState(PANEL_DEFAULT)
   const autoSearchedRef = useRef<string | null>(null)
+  const isDraggingRef = useRef(false)
+  const dragStartXRef = useRef(0)
+  const dragStartWidthRef = useRef(0)
+
+  // Resize drag handle
+  const handleDragStart = (e: React.MouseEvent) => {
+    e.preventDefault()
+    isDraggingRef.current = true
+    dragStartXRef.current = e.clientX
+    dragStartWidthRef.current = panelWidth
+
+    const handleMouseMove = (ev: MouseEvent) => {
+      if (!isDraggingRef.current) return
+      const delta = dragStartXRef.current - ev.clientX
+      const newWidth = Math.min(PANEL_MAX, Math.max(PANEL_MIN, dragStartWidthRef.current + delta))
+      setPanelWidth(newWidth)
+      onWidthChange?.(newWidth)
+    }
+
+    const handleMouseUp = () => {
+      isDraggingRef.current = false
+      window.removeEventListener('mousemove', handleMouseMove)
+      window.removeEventListener('mouseup', handleMouseUp)
+    }
+
+    window.addEventListener('mousemove', handleMouseMove)
+    window.addEventListener('mouseup', handleMouseUp)
+  }
 
   // Load existing embedded artwork when suggestion loads
   useEffect(() => {
@@ -229,7 +270,7 @@ export default function SuggestionPanel({ show, onClose, onApprove, onSkip, dest
           position: 'fixed',
           top: '56px',
           right: 0,
-          width: '420px',
+          width: `${panelWidth}px`,
           height: 'calc(100vh - 56px)',
           background: 'var(--surface)',
           borderLeft: '1px solid var(--border)',
@@ -240,6 +281,22 @@ export default function SuggestionPanel({ show, onClose, onApprove, onSkip, dest
           animation: 'slideInRight 0.25s ease',
         }}
       >
+        {/* Drag handle on left edge */}
+        <div
+          onMouseDown={handleDragStart}
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '5px',
+            height: '100%',
+            cursor: 'col-resize',
+            zIndex: 10,
+            background: 'transparent',
+          }}
+          title="Drag to resize"
+        />
+
         {loading ? (
           <div
             style={{
@@ -273,17 +330,17 @@ export default function SuggestionPanel({ show, onClose, onApprove, onSkip, dest
             {/* Header */}
             <div
               style={{
-                padding: '16px 20px',
+                padding: '14px 20px',
                 borderBottom: '1px solid var(--border)',
                 flexShrink: 0,
               }}
             >
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px' }}>
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ fontWeight: 700, fontSize: '16px', color: 'var(--text)', marginBottom: '2px' }}>
+                  <div style={{ fontWeight: 700, fontSize: '15px', color: 'var(--text)', marginBottom: '2px' }}>
                     {suggestion.artist || 'Unknown Artist'}
                   </div>
-                  <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+                  <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
                     {suggestion.date}
                     {suggestion.venue ? ` · ${suggestion.venue}` : ''}
                     {suggestion.city ? `, ${suggestion.city}` : ''}
@@ -309,54 +366,46 @@ export default function SuggestionPanel({ show, onClose, onApprove, onSkip, dest
               </div>
             </div>
 
-            {/* Body: two columns */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0, flex: 1, overflow: 'hidden' }}>
-              {/* Left: Current state */}
-              <div
-                style={{
-                  padding: '16px 16px',
-                  borderRight: '1px solid var(--border)',
-                  background: 'var(--bg)',
-                  overflowY: 'auto',
-                }}
-              >
-                <div style={{ ...labelStyle, marginBottom: '12px' }}>Current</div>
+            {/* Body: single scrollable column */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '0 20px' }}>
 
+              {/* === CURRENT === */}
+              <div style={sectionStyle}>
+                <div style={{ ...labelStyle, marginBottom: '10px' }}>Current</div>
+
+                {/* Album art (if album or has embedded art) */}
                 {(existingArtworkUrl || suggestion.releaseType === 'album') && (
-                  <div style={{ marginBottom: '14px' }}>
-                    <div style={labelStyle}>Album Art</div>
-                    <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-end' }}>
-                      <div style={{
-                        width: 64, height: 64, borderRadius: 8,
-                        background: 'var(--surface)', overflow: 'hidden', flexShrink: 0,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: 20, border: '1px solid var(--border)',
-                      }}>
-                        {existingArtworkUrl
-                          ? <img src={existingArtworkUrl} alt="artwork" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                          : <span style={{ color: 'var(--text-muted)' }}>💿</span>
-                        }
-                      </div>
-                      <div>
-                        <div style={{ fontSize: 12, fontWeight: 600 }}>{show.albumTitle || show.artist}</div>
-                        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{show.artist}</div>
-                        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{show.year || show.date?.slice(0, 4)}</div>
-                        <div style={{ fontSize: 10, color: existingArtworkUrl ? 'var(--success)' : 'var(--text-muted)', marginTop: 3 }}>
-                          {existingArtworkUrl ? '✓ Artwork embedded' : '⚠ No artwork'}
-                        </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+                    <div style={{
+                      width: 56, height: 56, borderRadius: 8,
+                      background: 'var(--bg)', overflow: 'hidden', flexShrink: 0,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: 20, border: '1px solid var(--border)',
+                    }}>
+                      {existingArtworkUrl
+                        ? <img src={existingArtworkUrl} alt="artwork" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        : <span style={{ color: 'var(--text-muted)' }}>💿</span>
+                      }
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 600 }}>{show.albumTitle || show.artist}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>{show.artist}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{show.year || show.date?.slice(0, 4)}</div>
+                      <div style={{ fontSize: 10, color: existingArtworkUrl ? 'var(--success)' : 'var(--text-muted)', marginTop: 2 }}>
+                        {existingArtworkUrl ? '✓ Artwork embedded' : '⚠ No artwork'}
                       </div>
                     </div>
                   </div>
                 )}
 
-                <div style={{ marginBottom: '10px' }}>
+                <div style={{ marginBottom: '8px' }}>
                   <div style={labelStyle}>Folder</div>
                   <div style={{ fontSize: '11px', fontFamily: 'monospace', color: 'var(--text-muted)', wordBreak: 'break-all' }}>
                     {show.folderPath.split('/').pop()}
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginBottom: '10px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 12px', marginBottom: existingArtworkUrl || firstFile?.existingTags ? '8px' : 0 }}>
                   <div>
                     <div style={labelStyle}>Artist</div>
                     <div style={{ fontSize: '12px' }}>{show.artist || <span style={{ color: 'var(--text-muted)' }}>—</span>}</div>
@@ -378,7 +427,7 @@ export default function SuggestionPanel({ show, onClose, onApprove, onSkip, dest
                 </div>
 
                 {firstFile?.existingTags && Object.keys(firstFile.existingTags).length > 0 && (
-                  <div style={{ marginBottom: '10px' }}>
+                  <div style={{ marginTop: '8px' }}>
                     <div style={labelStyle}>Existing Tags</div>
                     {Object.entries(firstFile.existingTags).map(([k, v]) => (
                       <div key={k} style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
@@ -387,22 +436,11 @@ export default function SuggestionPanel({ show, onClose, onApprove, onSkip, dest
                     ))}
                   </div>
                 )}
-
-                <div>
-                  <div style={labelStyle}>Files ({show.fileCount})</div>
-                  <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
-                    {show.files.map((f, i) => (
-                      <div key={i} style={{ fontSize: '11px', fontFamily: 'monospace', color: 'var(--text-muted)', padding: '1px 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {f.filename}
-                      </div>
-                    ))}
-                  </div>
-                </div>
               </div>
 
-              {/* Right: Proposed state (editable) */}
-              <div style={{ padding: '16px', overflowY: 'auto', background: 'var(--surface)' }}>
-                <div style={{ ...labelStyle, color: 'var(--accent)', marginBottom: '12px' }}>Proposed</div>
+              {/* === PROPOSED === */}
+              <div style={sectionStyle}>
+                <div style={{ ...labelStyle, color: 'var(--accent)', marginBottom: '10px' }}>Proposed</div>
 
                 <div style={{ marginBottom: '10px' }}>
                   <div style={labelStyle}>Folder Name</div>
@@ -457,7 +495,7 @@ export default function SuggestionPanel({ show, onClose, onApprove, onSkip, dest
                 </div>
 
                 {suggestion.releaseType === 'live' ? (
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginBottom: '10px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 12px' }}>
                     <div><div style={labelStyle}>Artist</div><input style={fieldStyle} value={suggestion.artist} onChange={e => update('artist', e.target.value)} /></div>
                     <div><div style={labelStyle}>Date</div><input style={fieldStyle} value={suggestion.date} onChange={e => update('date', e.target.value)} /></div>
                     <div><div style={labelStyle}>Venue</div><input style={fieldStyle} value={suggestion.venue} onChange={e => update('venue', e.target.value)} /></div>
@@ -476,13 +514,13 @@ export default function SuggestionPanel({ show, onClose, onApprove, onSkip, dest
                     </div>
                   </div>
                 ) : (
-                  <div style={{ marginBottom: '10px' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 80px', gap: '6px', marginBottom: '8px' }}>
-                      <div><div style={labelStyle}>Artist</div><input style={fieldStyle} value={suggestion.artist} onChange={e => update('artist', e.target.value)} /></div>
+                  <div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 12px', marginBottom: '10px' }}>
+                      <div style={{ gridColumn: '1 / -1' }}><div style={labelStyle}>Artist</div><input style={fieldStyle} value={suggestion.artist} onChange={e => update('artist', e.target.value)} /></div>
                       <div><div style={labelStyle}>Album Title</div><input style={fieldStyle} value={suggestion.albumTitle} onChange={e => setSuggestion(prev => prev ? { ...prev, albumTitle: e.target.value } : prev)} /></div>
                       <div><div style={labelStyle}>Year</div><input style={fieldStyle} value={suggestion.year} onChange={e => setSuggestion(prev => prev ? { ...prev, year: e.target.value } : prev)} /></div>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
                       <button
                         onClick={searchMusicBrainz}
                         disabled={mbSearching || !suggestion.artist}
@@ -501,47 +539,64 @@ export default function SuggestionPanel({ show, onClose, onApprove, onSkip, dest
                     </div>
                   </div>
                 )}
-
-                {/* File renames with diff highlighting */}
-                <div style={{ marginBottom: '14px' }}>
-                  <div style={labelStyle}>File Renames</div>
-                  <div style={{ overflowY: 'auto', maxHeight: '220px' }}>
-                    {suggestion.proposedFiles.map((f, i) => (
-                      <div key={i} style={{ marginBottom: '6px' }}>
-                        <div style={{ fontSize: '10px', color: 'var(--text-muted)', fontFamily: 'monospace', marginBottom: '2px', opacity: 0.7 }}>
-                          <FileDiff original={f.originalFilename} proposed={f.proposedFilename} />
-                        </div>
-                        <input
-                          style={{ ...fieldStyle, fontSize: '11px', fontFamily: 'monospace' }}
-                          value={f.proposedFilename}
-                          onChange={e => updateFileProposal(i, e.target.value)}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Artwork */}
-                <div style={{ paddingTop: '12px', borderTop: '1px solid var(--border)' }}>
-                  <ArtworkPicker
-                    artist={suggestion.artist}
-                    date={suggestion.date}
-                    venue={suggestion.venue}
-                    city={suggestion.city}
-                    state={suggestion.state}
-                    destDir={
-                      destinationRoot && suggestion.artist && suggestion.proposedFolderName
-                        ? `${destinationRoot}/${suggestion.artist}/${suggestion.proposedFolderName}`
-                        : undefined
-                    }
-                    artistDir={
-                      destinationRoot && suggestion.artist
-                        ? `${destinationRoot}/${suggestion.artist}`
-                        : undefined
-                    }
-                  />
-                </div>
               </div>
+
+              {/* === FILE RENAMES === */}
+              <div style={sectionStyle}>
+                <div style={{ ...labelStyle, marginBottom: '10px' }}>File Renames ({suggestion.proposedFiles.length})</div>
+                {suggestion.proposedFiles.map((f, i) => (
+                  <div key={i} style={{ marginBottom: '10px' }}>
+                    {/* Original filename — strikethrough */}
+                    <div style={{
+                      fontSize: '11px',
+                      fontFamily: 'monospace',
+                      color: 'var(--text-muted)',
+                      textDecoration: 'line-through',
+                      opacity: 0.6,
+                      wordBreak: 'break-all',
+                      lineHeight: 1.4,
+                      marginBottom: '3px',
+                    }}>
+                      {f.originalFilename}
+                    </div>
+                    {/* Arrow */}
+                    <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '3px', paddingLeft: '2px' }}>↓</div>
+                    {/* Proposed filename — editable */}
+                    <input
+                      style={{
+                        ...fieldStyle,
+                        fontSize: '11px',
+                        fontFamily: 'monospace',
+                        color: 'var(--accent)',
+                      }}
+                      value={f.proposedFilename}
+                      onChange={e => updateFileProposal(i, e.target.value)}
+                    />
+                  </div>
+                ))}
+              </div>
+
+              {/* === ARTWORK === */}
+              <div style={{ paddingTop: '16px', paddingBottom: '16px' }}>
+                <ArtworkPicker
+                  artist={suggestion.artist}
+                  date={suggestion.date}
+                  venue={suggestion.venue}
+                  city={suggestion.city}
+                  state={suggestion.state}
+                  destDir={
+                    destinationRoot && suggestion.artist && suggestion.proposedFolderName
+                      ? `${destinationRoot}/${suggestion.artist}/${suggestion.proposedFolderName}`
+                      : undefined
+                  }
+                  artistDir={
+                    destinationRoot && suggestion.artist
+                      ? `${destinationRoot}/${suggestion.artist}`
+                      : undefined
+                  }
+                />
+              </div>
+
             </div>
 
             {/* Footer */}
@@ -556,7 +611,7 @@ export default function SuggestionPanel({ show, onClose, onApprove, onSkip, dest
               {jellyfinPath && (
                 <div
                   style={{
-                    padding: '8px 16px',
+                    padding: '8px 20px',
                     borderBottom: '1px solid var(--border)',
                     fontSize: '11px',
                     color: 'var(--text-muted)',
@@ -574,20 +629,20 @@ export default function SuggestionPanel({ show, onClose, onApprove, onSkip, dest
               {/* Actions */}
               <div
                 style={{
-                  padding: '10px 16px',
+                  padding: '10px 20px',
                   display: 'flex',
                   gap: '8px',
                   justifyContent: 'space-between',
                   alignItems: 'center',
                 }}
               >
-                <div style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'flex', gap: '10px' }}>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                   <span><kbd style={kbdStyle}>A</kbd> approve</span>
                   <span><kbd style={kbdStyle}>S</kbd> skip</span>
                   <span><kbd style={kbdStyle}>← →</kbd> nav</span>
                   <span><kbd style={kbdStyle}>Esc</kbd> close</span>
                 </div>
-                <div style={{ display: 'flex', gap: '8px' }}>
+                <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
                   <button
                     className="btn-secondary"
                     style={{ padding: '6px 16px', fontSize: '13px', borderRadius: '6px' }}
@@ -631,37 +686,4 @@ const kbdStyle: React.CSSProperties = {
   fontSize: '10px',
   fontFamily: 'monospace',
   color: 'var(--text-muted)',
-}
-
-// Simple diff: show unchanged prefix/suffix in muted, changed middle highlighted
-function FileDiff({ original, proposed }: { original: string; proposed: string }) {
-  if (original === proposed) {
-    return <span style={{ color: 'var(--text-muted)' }}>{original}</span>
-  }
-
-  // Find common prefix
-  let prefixLen = 0
-  const minLen = Math.min(original.length, proposed.length)
-  while (prefixLen < minLen && original[prefixLen] === proposed[prefixLen]) prefixLen++
-
-  // Find common suffix (only after prefix)
-  let suffixLen = 0
-  while (
-    suffixLen < minLen - prefixLen &&
-    original[original.length - 1 - suffixLen] === proposed[proposed.length - 1 - suffixLen]
-  ) suffixLen++
-
-  const prefix = original.slice(0, prefixLen)
-  const removed = original.slice(prefixLen, original.length - suffixLen)
-  const suffix = original.slice(original.length - suffixLen || original.length)
-
-  return (
-    <span>
-      {prefix && <span style={{ color: 'var(--text-muted)' }}>{prefix}</span>}
-      {removed && (
-        <span style={{ color: 'var(--error)', textDecoration: 'line-through', opacity: 0.7 }}>{removed}</span>
-      )}
-      {suffix && <span style={{ color: 'var(--text-muted)' }}>{suffix}</span>}
-    </span>
-  )
 }
