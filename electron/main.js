@@ -8,7 +8,25 @@ const __dirname = path.dirname(__filename);
 const PORT = 7337;
 let serverProcess = null;
 let mainWindow = null;
+function fixPath() {
+    // Electron packaged apps get a stripped PATH. Restore common tool locations.
+    const extraPaths = [
+        '/opt/homebrew/bin',
+        '/opt/homebrew/sbin',
+        '/usr/local/bin',
+        '/usr/local/sbin',
+        `${process.env.HOME}/.local/bin`,
+    ];
+    const currentPath = process.env.PATH || '/usr/bin:/bin:/usr/sbin:/sbin';
+    const pathSet = new Set(currentPath.split(':'));
+    for (const p of extraPaths) {
+        if (!pathSet.has(p))
+            pathSet.add(p);
+    }
+    process.env.PATH = Array.from(pathSet).join(':');
+}
 function spawnServer() {
+    fixPath();
     const env = { ...process.env, ELECTRON_RUN_AS_NODE: '1' };
     if (app.isPackaged) {
         // Packaged: run compiled ESM server — asar:false means real files on disk

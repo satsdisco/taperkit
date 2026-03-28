@@ -11,7 +11,25 @@ const PORT = 7337
 let serverProcess: ChildProcess | null = null
 let mainWindow: BrowserWindow | null = null
 
+function fixPath(): void {
+  // Electron packaged apps get a stripped PATH. Restore common tool locations.
+  const extraPaths = [
+    '/opt/homebrew/bin',
+    '/opt/homebrew/sbin',
+    '/usr/local/bin',
+    '/usr/local/sbin',
+    `${process.env.HOME}/.local/bin`,
+  ]
+  const currentPath = process.env.PATH || '/usr/bin:/bin:/usr/sbin:/sbin'
+  const pathSet = new Set(currentPath.split(':'))
+  for (const p of extraPaths) {
+    if (!pathSet.has(p)) pathSet.add(p)
+  }
+  process.env.PATH = Array.from(pathSet).join(':')
+}
+
 function spawnServer(): ChildProcess {
+  fixPath()
   const env = { ...process.env, ELECTRON_RUN_AS_NODE: '1' }
 
   if (app.isPackaged) {
