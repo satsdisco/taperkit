@@ -8,8 +8,13 @@ interface Props {
 }
 
 export default function BatchProgress({ approved, results, done }: Props) {
-  const total = approved.length
+  const initialTotalRef = useRef(approved.length)
+  // Capture the initial total on first render (before approved starts shrinking from successes)
+  if (approved.length > initialTotalRef.current) {
+    initialTotalRef.current = approved.length
+  }
   const completed = results.length
+  const total = Math.max(initialTotalRef.current, completed)
   const succeeded = results.filter(r => r.success).length
   const failed = results.filter(r => !r.success).length
   const pct = total > 0 ? Math.round((completed / total) * 100) : 0
@@ -124,11 +129,22 @@ export default function BatchProgress({ approved, results, done }: Props) {
           overflow: 'hidden',
         }}
       >
-        {approved.map((s, i) => {
+        {/* Build combined list: completed results first, then still-pending approved items */}
+        {(() => {
+          const completedIds = new Set(results.map(r => r.showId))
+          const pendingItems = approved.filter(s => !completedIds.has(s.showId))
+          const allItems: Array<{ showId: string; artist: string; date?: string }> = [
+            ...results.map(r => {
+              const orig = approved.find(a => a.showId === r.showId)
+              return { showId: r.showId, artist: orig?.artist || r.showId, date: orig?.date }
+            }),
+            ...pendingItems,
+          ]
+          return allItems.map((s, i) => {
           const result = resultMap.get(s.showId)
           const isPending = !result
           const isSuccess = result?.success
-          const isLast = i === approved.length - 1
+          const isLast = i === allItems.length - 1
           return (
             <div
               key={s.showId}
@@ -179,7 +195,9 @@ export default function BatchProgress({ approved, results, done }: Props) {
               </div>
             </div>
           )
-        })}
+        })
+          })()
+        }
       </div>
     </div>
   )

@@ -328,24 +328,48 @@ export default function LibraryView({ libraryPath, onLibraryPathChange, onSwitch
       })
 
       if (!response.ok) {
-        const errData = await response.json().catch(() => ({ error: `HTTP ${response.status}` }))
-        throw new Error(errData.error || `Server error ${response.status}`)
+        const errText = await response.text()
+        console.error('[TaperKit] Apply response not OK:', response.status, errText)
+        try {
+          const errData = JSON.parse(errText)
+          throw new Error(errData.error || `Server error ${response.status}`)
+        } catch {
+          throw new Error(`Server error ${response.status}: ${errText.slice(0, 200)}`)
+        }
       }
 
       const reader = response.body!.getReader()
       const decoder = new TextDecoder()
       let buffer = ''
+      let chunksReceived = 0
 
       while (true) {
         const { done, value } = await reader.read()
-        if (done) break
-        buffer += decoder.decode(value, { stream: true })
+        if (done) {
+          console.log('[TaperKit] Stream done. Total chunks:', chunksReceived, 'Remaining buffer:', JSON.stringify(buffer))
+          // Process any remaining data in buffer
+          if (buffer.trim()) {
+            try {
+              const result = JSON.parse(buffer.trim()) as BatchApplyResult
+              setApplyResults(prev => [...prev, result])
+              console.log('[TaperKit] Parsed final buffer result:', result)
+            } catch (e) {
+              console.error('[TaperKit] Failed to parse final buffer:', buffer, e)
+            }
+          }
+          break
+        }
+        chunksReceived++
+        const chunk = decoder.decode(value, { stream: true })
+        console.log('[TaperKit] Chunk', chunksReceived, ':', JSON.stringify(chunk))
+        buffer += chunk
         const lines = buffer.split('\n')
         buffer = lines.pop() || ''
         for (const line of lines) {
           if (line.trim()) {
             try {
               const result = JSON.parse(line) as BatchApplyResult
+              console.log('[TaperKit] Parsed result:', result)
               setApplyResults(prev => [...prev, result])
               if (result.success) {
                 setShows(prev => prev.map(s =>
@@ -364,6 +388,7 @@ export default function LibraryView({ libraryPath, onLibraryPathChange, onSwitch
         }
       }
     } catch (err) {
+      console.error('[TaperKit] Apply catch:', err)
       setError(err instanceof Error ? err.message : 'Apply failed')
     } finally {
       setApplyDone(true)
