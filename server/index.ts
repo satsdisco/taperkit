@@ -698,7 +698,15 @@ app.get('/api/artwork/existing', (req, res) => {
 })
 
 // Serve built frontend in production (when dist/ exists)
-const distPath = path.join(__dirname, '..', 'dist')
+// In packaged Electron: server runs from dist/server/, frontend is in dist/ (parent dir)
+// In dev/standalone: server runs from server/, frontend is in ../dist/
+const distCandidates = [
+  path.join(__dirname, '..', 'dist'),  // dev: server/ → ../dist/
+  path.join(__dirname, '..'),          // packaged: dist/server/ → dist/ (where index.html lives)
+]
+const distPath = distCandidates.find(p =>
+  fs.existsSync(path.join(p, 'index.html'))
+) || distCandidates[0]
 if (fs.existsSync(distPath)) {
   app.use(express.static(distPath))
   // SPA fallback — serve index.html for all non-API routes
