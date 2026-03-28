@@ -313,6 +313,11 @@ export default function LibraryView({ libraryPath, onLibraryPathChange, onSwitch
     setApplyDone(false)
 
     try {
+      if (!sources.destination) {
+        setError('No destination folder set. Configure a destination in Source Configuration before applying.')
+        return
+      }
+
       const response = await fetch('/api/library/apply-batch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -321,6 +326,11 @@ export default function LibraryView({ libraryPath, onLibraryPathChange, onSwitch
           destinationRoot: sources.destination,
         }),
       })
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({ error: `HTTP ${response.status}` }))
+        throw new Error(errData.error || `Server error ${response.status}`)
+      }
 
       const reader = response.body!.getReader()
       const decoder = new TextDecoder()
@@ -344,8 +354,12 @@ export default function LibraryView({ libraryPath, onLibraryPathChange, onSwitch
                     : s
                 ))
                 setApprovedSuggestions(prev => prev.filter(s => s.showId !== result.showId))
+              } else {
+                console.error('[TaperKit] Apply failed for', result.showId, result.error)
               }
-            } catch { /* skip malformed line */ }
+            } catch (parseErr) {
+              console.error('[TaperKit] Failed to parse apply result line:', line, parseErr)
+            }
           }
         }
       }
